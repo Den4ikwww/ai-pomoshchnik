@@ -22,11 +22,11 @@
   <div class="auth-card">
     <div class="auth-icon"><i class="fas fa-lock"></i></div>
     <h2 class="gradient-title">Вход в аккаунт</h2>
-    <div class="form-group"><label>Email</label><input type="email" id="auth-email" placeholder="name@example.com" autocomplete="off"></div>
+    <div class="form-group"><label>Email</label><input type="email" id="auth-email" placeholder="name@example.com"></div>
     <div class="form-group">
       <label>Пароль</label>
       <div class="password-wrapper">
-        <input type="password" id="auth-pass" placeholder="••••••••" autocomplete="off" autofill="off" readonly onfocus="this.removeAttribute('readonly')" data-1p-ignore>
+        <input type="password" id="auth-pass" placeholder="••••••••">
         <button type="button" class="toggle-password" onclick="window.togglePasswordVisibility('auth-pass', this)"><i class="fas fa-eye"></i></button>
       </div>
     </div>
@@ -47,8 +47,7 @@
     <div class="auth-icon"><i class="fas fa-user-circle"></i></div>
     <h2 class="gradient-title">Добро пожаловать!</h2>
     <div class="form-group">
-      <label>Как вас зовут?</label>
-      <input type="text" id="user-name" placeholder="Ваше имя" autocomplete="off">
+      <label>Как вас зовут?</label>      <input type="text" id="user-name" placeholder="Ваше имя">
     </div>
     <p class="auth-text" style="margin-top:16px;">Ваши задачи хранятся в защищённом облаке. Мы не передаём данные третьим лицам.</p>
     <label class="checkbox-label">
@@ -70,6 +69,7 @@
   </header>
 
   <main id="main-content">
+    <!-- ДОМ -->
     <section id="tab-home" class="tab active">
       <div class="stats-grid">
         <div class="stat-card"><div class="stat-num" id="stat-active">0</div><div class="stat-label">Активных</div></div>
@@ -91,17 +91,12 @@
       <div class="task-list" id="home-tasks"></div>
     </section>
 
+    <!-- ЧАТ -->
     <section id="tab-chat" class="tab">
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-        <h3 style="flex:1; margin:0;">Чат</h3>
-        <button id="clear-chat-btn" style="background:none; border:none; color:#EF4444; font-size:18px; cursor:pointer; padding:8px;">
-          <i class="fas fa-trash-alt"></i>
-        </button>
-      </div>
       <div class="chat-container" id="chat-messages"></div>
     </section>
 
-    <section id="tab-memory" class="tab">
+    <!-- ПАМЯТЬ -->    <section id="tab-memory" class="tab">
       <div class="toggle-fav" id="fav-toggle" onclick="window.toggleFavFilter()">
         <span><i class="fas fa-heart"></i> Только избранное</span>
         <div class="switch"></div>
@@ -109,6 +104,7 @@
       <div class="category-list" id="memory-categories"></div>
     </section>
 
+    <!-- НАСТРОЙКИ -->
     <section id="tab-settings" class="tab">
       <div class="category-item" onclick="window.exportData()">
         <div class="cat-icon"><i class="fas fa-download"></i></div>
@@ -126,13 +122,14 @@
   </main>
 
   <div class="input-bar" id="input-bar" style="display:none;">
-    <button id="voice-btn" style="width:44px;height:44px;border:none;border-radius:30px;background:var(--bg-relief);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;margin-right:8px;">
+    <button id="voice-btn" style="width:44px;height:44px;border:none;border-radius:30px;background:var(--bg-relief);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;transition:all 0.2s;margin-right:8px;">
       <i class="fas fa-microphone"></i>
     </button>
     <input type="text" id="chat-input" placeholder="Сообщение...">
     <button id="send-btn"><i class="fas fa-paper-plane"></i></button>
   </div>
 
+  <!-- НИЖНЯЯ НАВИГАЦИЯ -->
   <nav>
     <div class="nav-container">
       <div class="nav-item active" data-tab="home"><i class="fas fa-home"></i><span>Дом</span></div>
@@ -148,14 +145,25 @@
       <input type="hidden" id="edit-id">
       <div class="form-group"><label>Название</label><input type="text" id="edit-title"></div>
       <div class="form-group"><label>Тип</label><select id="edit-notify-type"><option value="important">Важные</option><option value="brief">Краткие</option><option value="permanent">Постоянные</option></select></div>
-      <div class="form-group"><label>Дата и время</label><input type="datetime-local" id="edit-datetime"></div>
-      <div class="modal-actions"><button class="btn-cancel" onclick="window.closeModal()">Отмена</button><button class="btn-save" onclick="window.saveEdit()">Сохранить</button></div>
+      <div class="form-group"><label>Дата и время</label><input type="datetime-local" id="edit-datetime"></div>      <div class="modal-actions"><button class="btn-cancel" onclick="window.closeModal()">Отмена</button><button class="btn-save" onclick="window.saveEdit()">Сохранить</button></div>
     </div>
   </div>
 </div>
 
 <div id="toast"><i class="fas fa-check"></i> Готово</div>
 
+<!-- 🔧 СКРИПТЫ -->
 <script type="module" src="script.js"></script>
+
+<!-- 🔧 РЕГИСТРАЦИЯ SERVICE WORKER (исправлено для подпапки) -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js', { scope: './' })
+        .then(reg => console.log('✅ SW registered:', reg.scope))
+        .catch(err => console.log('❌ SW error:', err));
+    });
+  }
+</script>
 </body>
 </html>
