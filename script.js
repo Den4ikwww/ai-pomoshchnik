@@ -2,7 +2,7 @@
 // 🛡️ УТИЛИТЫ И ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup, browserLocalPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDocs, addDoc, deleteDoc, updateDoc, query, orderBy, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -18,6 +18,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
+
+// СОХРАНЯТЬ ВХОД ПОСЛЕ ЗАКРЫТИЯ БРАУЗЕРА
+setPersistence(auth, browserLocalPersistence).catch(console.error);
 
 let firebaseUser = null;
 let currentUserName = "Друг";
@@ -44,7 +47,6 @@ var showOldTasks = false;
 var notifyFilter = 'all';
 var showFavoritesOnly = false;
 var awaitingTypeConfirm = null;
-var deletedItemsCount = safeGet('deleted_count', 0);
 
 var categories = [
   {id:'passwords', name:'Пароли', fav:false},
@@ -101,7 +103,6 @@ async function syncTasksToFirebase(userId, tasksList) {
       }
     }
     await batch.commit();
-    console.log("✅ Задачи синхронизированы с Firebase");
   } catch(e) { console.error("Ошибка синхронизации:", e); }
 }
 
@@ -898,10 +899,22 @@ function setupChat() {
   var sendBtn = $('send-btn');
   var voiceBtn = $('voice-btn');
   
+  // Кнопка очистки чата
+  var clearChatBtn = $('clear-chat-btn');
+  if (clearChatBtn) {
+    clearChatBtn.onclick = () => {
+      if (confirm('Очистить всю историю чата?')) {
+        if (chatMessages) chatMessages.innerHTML = '';
+        localStorage.removeItem('chat_history');
+        addMessage('🧹 История чата очищена', 'ai');
+      }
+    };
+  }
+  
   var userName = 'Пользователь';
   if (firebaseUser && firebaseUser.displayName) userName = firebaseUser.displayName;
   
-  if (chatMessages) {
+  if (chatMessages && chatMessages.children.length === 0) {
     chatMessages.innerHTML = '<div class="message ai"><div class="bubble">Привет, ' + userName + '! 👋 Я готов к работе.</div></div>';
   }
   
