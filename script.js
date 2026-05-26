@@ -1,6 +1,27 @@
 // ==========================================
 // 🛡️ УТИЛИТЫ И ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
 // ==========================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDocs, addDoc, deleteDoc, updateDoc, query, orderBy, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDFvrwVTOVJs4taMF2VwDwTxP1a3JYWsow",
+  authDomain: "flutter-ai-playground-219ed.firebaseapp.com",
+  projectId: "flutter-ai-playground-219ed",
+  storageBucket: "flutter-ai-playground-219ed.firebasestorage.app",
+  messagingSenderId: "1042887981071",
+  appId: "1:1042887981071:web:1c49d513000dae97b98b7a"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+
+let firebaseUser = null;
+let currentUserName = "Друг";
+
 const $ = id => document.getElementById(id);
 const safeGet = (k, d) => { 
   try { 
@@ -24,7 +45,6 @@ var notifyFilter = 'all';
 var showFavoritesOnly = false;
 var awaitingTypeConfirm = null;
 var deletedItemsCount = safeGet('deleted_count', 0);
-var currentUser = safeGet('mock_user');
 
 var categories = [
   {id:'passwords', name:'Пароли', fav:false},
@@ -56,6 +76,68 @@ var headerIcons = {
 };
 
 // ==========================================
+// 📦 СИНХРОНИЗАЦИЯ С FIREBASE
+// ==========================================
+async function syncTasksToFirebase(userId, tasksList) {
+  if (!userId) return;
+  try {
+    const tasksRef = collection(db, `users/${userId}/tasks`);
+    const snapshot = await getDocs(tasksRef);
+    const batch = writeBatch(db);
+    snapshot.forEach(docSnap => batch.delete(docSnap.ref));
+    for (const task of tasksList) {
+      if (!task.deletedAt) {
+        const newRef = doc(tasksRef);
+        batch.set(newRef, {
+          id: task.id,
+          title: task.title,
+          completed: task.done || false,
+          type: task.type,
+          notifyType: task.notifyType,
+          datetime: task.datetime || null,
+          created: task.created,
+          createdAt: serverTimestamp()
+        });
+      }
+    }
+    await batch.commit();
+    console.log("✅ Задачи синхронизированы с Firebase");
+  } catch(e) { console.error("Ошибка синхронизации:", e); }
+}
+
+async function loadTasksFromFirebase(userId) {
+  if (!userId) return [];
+  try {
+    const tasksRef = collection(db, `users/${userId}/tasks`);
+    const q = query(tasksRef, orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    const loadedTasks = [];
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      loadedTasks.push({
+        id: data.id || docSnap.id,
+        title: data.title,
+        type: data.type || (data.datetime ? 'reminder' : 'note'),
+        notifyType: data.notifyType || 'brief',
+        datetime: data.datetime || null,
+        created: data.created || new Date().toISOString(),
+        done: data.completed || false,
+        deletedAt: null
+      });
+    });
+    return loadedTasks;
+  } catch(e) { 
+    console.error("Ошибка загрузки из Firebase:", e);
+    return [];
+  }
+}
+
+async function saveTasks() {
+  safeSet('ai_tasks', tasks);
+  if (firebaseUser) await syncTasksToFirebase(firebaseUser.uid, tasks);
+}
+
+// ==========================================
 // 📱 ЭКРАНЫ И ИНИЦИАЛИЗАЦИЯ
 // ==========================================
 function showScreen(id) {
@@ -70,20 +152,6 @@ function showScreen(id) {
         el.style.display = 'none';
       }
     }
-  }
-}
-
-function checkAuth() {
-  if (currentUser) {
-    var p = safeGet('profile_' + currentUser.uid);
-    if (p && p.name) {
-      showScreen('app-wrapper');
-      initApp();
-    } else {
-      showScreen('consent-screen');
-    }
-  } else {
-    showScreen('auth-screen');
   }
 }
 
@@ -148,7 +216,6 @@ window.setHomeFilter = function(type) {
   if (c) c.classList.add('active');
   showOldTasks = false;
   
-  // Показываем/скрываем фильтры уведомлений и info-banner
   var notifyTabs = document.getElementById('notify-tabs-inline');
   var notifyInfo = $('notify-info');
   if (type === 'note') {
@@ -236,7 +303,6 @@ function renderHome() {
   var list = $('home-tasks');
   if (!list) return;
 
-  // Собираем задачи по фильтру напоминания/заметки
   var vis = [];
   for (var i = 0; i < tasks.length; i++) {
     var t = tasks[i];
@@ -248,7 +314,6 @@ function renderHome() {
     }
   }
   
-  // Фильтруем по типу уведомления, если выбраны напоминания
   if (homeFilter === 'reminder' && notifyFilter !== 'all') {
     var filtered = [];
     for (var i = 0; i < vis.length; i++) {
@@ -299,7 +364,7 @@ function renderHome() {
     html += '    </div>';
     html += '    <div class="task-content" onclick="openEditModal(\'' + t.id + '\')">';
     html += '      <span class="type-tag ' + tagClass + '">' + label + '</span>';
-    html += '      <h3>' + t.title + '</h3>';
+    html += '      <h3>' + escapeHtml(t.title) + '</h3>';
     html += '      <div class="task-date">' + dateStr + '</div>';
     html += '    </div>';
     html += '    <div class="task-right' + trashActiveClass + '" data-id="' + t.id + '" data-done="' + isDone + '">';
@@ -310,6 +375,16 @@ function renderHome() {
   }
   list.innerHTML = html;
   initTrashActions();
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
 }
 
 // ==========================================
@@ -376,7 +451,7 @@ function initTrashActions() {
           return function() {
             handleDelete(self);
           };
-        }(this), 300);
+        }(this), 500);
       };
       
       trash.ontouchend = function(e) {
@@ -395,7 +470,7 @@ function initTrashActions() {
           return function() {
             handleDelete(self);
           };
-        }(this), 300);
+        }(this), 500);
       };
       
       trash.onmouseup = function(e) {
@@ -459,11 +534,6 @@ function showCustomConfirm(message, onConfirm) {
       document.body.removeChild(overlay);
     }
   };
-  
-  confirmBtn.onmouseover = function() { this.style.opacity = '0.8'; };
-  confirmBtn.onmouseout = function() { this.style.opacity = '1'; };
-  cancelBtn.onmouseover = function() { this.style.background = '#444'; };
-  cancelBtn.onmouseout = function() { this.style.background = '#333'; };
 }
 
 // ==========================================
@@ -475,7 +545,7 @@ window.toggleDone = function(id, e) {
   for (var i = 0; i < tasks.length; i++) {
     if (tasks[i].id === id) {
       tasks[i].done = !tasks[i].done;
-      safeSet('ai_tasks', tasks);
+      saveTasks();
       renderHome();
       break;
     }
@@ -491,7 +561,7 @@ window.deleteToTrash = function(id) {
     }
   }
   tasks = newTasks;
-  safeSet('ai_tasks', tasks);
+  saveTasks();
   renderHome();
   renderMemory();
   showToast();
@@ -591,7 +661,7 @@ window.saveEdit = function() {
     }
   }
   
-  safeSet('ai_tasks', tasks);
+  saveTasks();
   renderHome();
   closeModal();
 };
@@ -599,11 +669,10 @@ window.saveEdit = function() {
 window.logoutUser = function() {
   haptic(50);
   showCustomConfirm('Выйти из аккаунта?', function() {
-    localStorage.removeItem('mock_user');
-    if (currentUser) localStorage.removeItem('profile_' + currentUser.uid);
-    currentUser = null;
+    localStorage.clear();
     tasks = [];
-    checkAuth();
+    firebaseUser = null;
+    showScreen('auth-screen');
   });
 };
 
@@ -640,6 +709,8 @@ function showToast() {
 var voiceRecording = false;
 var mediaRecorder = null;
 var audioChunks = [];
+var chatInput = null;
+var chatMessages = null;
 
 function addMessage(txt, s) {
   if (!chatMessages) return;
@@ -684,14 +755,6 @@ function detectType(t) {
   return 'unknown';
 }
 
-function handleSend() {
-  if (!chatInput) return;
-  var text = chatInput.value.trim();
-  if (!text) return;
-  processUserMessage(text);
-  chatInput.value = '';
-}
-
 function processUserMessage(text) {
   addMessage(text, 'user');
   
@@ -709,7 +772,7 @@ function processUserMessage(text) {
     else { addMessage('Напиши 1, 2 или 3.', 'ai'); return; }
     tasks.push(awaitingTypeConfirm);
     awaitingTypeConfirm = null;
-    safeSet('ai_tasks', tasks);
+    saveTasks();
     renderHome();
     addMessage('✅ Записал!', 'ai');
     showToast();
@@ -725,7 +788,7 @@ function processUserMessage(text) {
   var task = {
     id: String(Date.now()), title: p.title || text, type: type,
     notifyType: nType === 'unknown' ? 'brief' : nType, category: cat,
-    datetime: p.dt, created: new Date().toISOString(), done: false
+    datetime: p.dt, created: new Date().toISOString(), done: false, deletedAt: null
   };
   
   if (type === 'reminder' && nType === 'unknown') {
@@ -735,10 +798,18 @@ function processUserMessage(text) {
   }
   
   tasks.push(task);
-  safeSet('ai_tasks', tasks);
+  saveTasks();
   renderHome();
   addMessage('✓ Записано!', 'ai');
   showToast();
+}
+
+function handleSend() {
+  if (!chatInput) return;
+  var text = chatInput.value.trim();
+  if (!text) return;
+  processUserMessage(text);
+  chatInput.value = '';
 }
 
 // ==========================================
@@ -793,33 +864,8 @@ function startVoiceInput() {
     
     recognition.start();
     
-  } else if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(function(stream) {
-        voiceRecording = true;
-        audioChunks = [];
-        
-        mediaRecorder = new MediaRecorder(stream);
-        
-        mediaRecorder.ondataavailable = function(e) {
-          audioChunks.push(e.data);
-        };
-        
-        mediaRecorder.onstop = function() {
-          stream.getTracks().forEach(function(track) { track.stop(); });
-          addMessage('🎤 Запись остановлена (распознавание не поддерживается)', 'ai');
-          voiceRecording = false;
-          updateVoiceButton();
-        };
-        
-        mediaRecorder.start();
-        updateVoiceButton();
-      })
-      .catch(function() {
-        alert('Нет доступа к микрофону');
-      });
   } else {
-    alert('Голосовой ввод не поддерживается');
+    alert('Голосовой ввод не поддерживается в этом браузере');
   }
 }
 
@@ -853,10 +899,7 @@ function setupChat() {
   var voiceBtn = $('voice-btn');
   
   var userName = 'Пользователь';
-  if (currentUser) {
-    var p = safeGet('profile_' + currentUser.uid);
-    if (p && p.name) userName = p.name;
-  }
+  if (firebaseUser && firebaseUser.displayName) userName = firebaseUser.displayName;
   
   if (chatMessages) {
     chatMessages.innerHTML = '<div class="message ai"><div class="bubble">Привет, ' + userName + '! 👋 Я готов к работе.</div></div>';
@@ -887,9 +930,99 @@ window.togglePasswordVisibility = function(inputId, btn) {
 };
 
 // ==========================================
+// 🔥 FIREBASE АВТОРИЗАЦИЯ
+// ==========================================
+function setupFirebaseUI() {
+  const loginBtn = $('btn-login');
+  const registerBtn = $('btn-register');
+  const googleBtn = $('btn-google');
+  const authEmail = $('auth-email');
+  const authPass = $('auth-pass');
+  const authError = $('auth-error');
+
+  if (loginBtn) {
+    loginBtn.onclick = async () => {
+      const email = authEmail?.value.trim();
+      const pass = authPass?.value;
+      if (!email || !pass) {
+        if (authError) authError.textContent = 'Введите email и пароль';
+        return;
+      }
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        if (authError) authError.textContent = '';
+      } catch(err) {
+        if (authError) authError.textContent = err.message;
+      }
+    };
+  }
+
+  if (registerBtn) {
+    registerBtn.onclick = async () => {
+      const email = authEmail?.value.trim();
+      const pass = authPass?.value;
+      if (!email || !pass) {
+        if (authError) authError.textContent = 'Введите email и пароль';
+        return;
+      }
+      if (pass.length < 6) {
+        if (authError) authError.textContent = 'Пароль минимум 6 символов';
+        return;
+      }
+      try {
+        await createUserWithEmailAndPassword(auth, email, pass);
+        if (authError) authError.textContent = '';
+      } catch(err) {
+        if (authError) authError.textContent = err.message;
+      }
+    };
+  }
+
+  if (googleBtn) {
+    googleBtn.onclick = async () => {
+      try {
+        await signInWithPopup(auth, googleProvider);
+        if (authError) authError.textContent = '';
+      } catch(err) {
+        if (authError) authError.textContent = err.message;
+      }
+    };
+  }
+}
+
+// ==========================================
+// 👂 ОТСЛЕЖИВАНИЕ АВТОРИЗАЦИИ
+// ==========================================
+onAuthStateChanged(auth, async (user) => {
+  firebaseUser = user;
+  if (user) {
+    const profile = safeGet(`profile_${user.uid}`, {});
+    if (!profile.name && user.displayName) {
+      profile.name = user.displayName;
+      safeSet(`profile_${user.uid}`, profile);
+    }
+    currentUserName = profile.name || user.email?.split('@')[0] || 'Пользователь';
+    
+    const loadedTasks = await loadTasksFromFirebase(user.uid);
+    if (loadedTasks.length > 0) {
+      tasks = loadedTasks;
+      safeSet('ai_tasks', tasks);
+    }
+    
+    showScreen('consent-screen');
+  } else {
+    firebaseUser = null;
+    tasks = [];
+    showScreen('auth-screen');
+  }
+});
+
+// ==========================================
 // 🚀 ЗАПУСК
 // ==========================================
 window.onload = function() {
+  setupFirebaseUI();
+  
   var agreeCheck = $('agree-check');
   var userNameInput = $('user-name');
   var btnConsent = $('btn-consent-next');
@@ -904,48 +1037,23 @@ window.onload = function() {
   if (userNameInput) userNameInput.oninput = updateConsentButton;
 
   if (btnConsent) {
-    btnConsent.onclick = function() {
+    btnConsent.onclick = async () => {
       haptic(15);
       var n = (userNameInput && userNameInput.value.trim()) || 'Пользователь';
-      if (currentUser) safeSet('profile_' + currentUser.uid, {name: n});
+      if (firebaseUser) {
+        await updateProfile(firebaseUser, { displayName: n });
+        safeSet(`profile_${firebaseUser.uid}`, { name: n });
+        currentUserName = n;
+      }
       showScreen('app-wrapper');
       initApp();
     };
   }
 
-  var btnLogin = $('btn-login');
-  var authEmail = $('auth-email');
-  var authPass = $('auth-pass');
-  var authError = $('auth-error');
-
-  if (btnLogin && authEmail) {
-    btnLogin.onclick = function() {
-      var em = authEmail.value.trim();
-      var pass = authPass ? authPass.value.trim() : '';
-      if (!em || em.indexOf('@') === -1) { if (authError) authError.textContent = 'Введите корректный email'; return; }
-      if (!pass || pass.length < 6) { if (authError) authError.textContent = 'Пароль должен быть не менее 6 символов'; return; }
-      currentUser = {email: em, uid: 'u' + Date.now()};
-      safeSet('mock_user', currentUser);
-      checkAuth();
-    };
-  }
-
-  var btnReg = $('btn-register');
-  if (btnReg) btnReg.onclick = function() { if (btnLogin) btnLogin.click(); };
-
-  var btnGoogle = $('btn-google');
-  if (btnGoogle) btnGoogle.onclick = function() { if (btnLogin) btnLogin.click(); };
-
   var btnSupportAuth = $('btn-support-auth');
   if (btnSupportAuth) {
-    btnSupportAuth.onclick = function() {
-      haptic(15);
-      var phone = '+79800984901';
-      var message = 'Здравствуйте! Нужна помощь с ИИ Помощником';
-      var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
-      window.open(url, '_blank');
-    };
+    btnSupportAuth.onclick = () => window.openSupportApp();
   }
 
-  checkAuth();
+  showScreen('auth-screen');
 };
