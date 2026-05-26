@@ -1,12 +1,12 @@
-const CACHE_NAME = 'ai-helper-v2'; // Обновил версию, чтобы сработало принудительно
+const CACHE_NAME = 'ai-helper-v1';
 const urlsToCache = [
-  './',
-  './index.html',
-  './style.css',
-  './script.js',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
+  '/',
+  '/index.html',
+  '/style.css',
+  '/script.js',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 self.addEventListener('install', event => {
