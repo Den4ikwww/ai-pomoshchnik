@@ -47,8 +47,7 @@
     <div class="auth-icon"><i class="fas fa-user-circle"></i></div>
     <h2 class="gradient-title">Добро пожаловать!</h2>
     <div class="form-group">
-      <label>Как вас зовут?</label>
-      <input type="text" id="user-name" placeholder="Ваше имя">
+      <label>Как вас зовут?</label>      <input type="text" id="user-name" placeholder="Ваше имя">
     </div>
     <p class="auth-text" style="margin-top:16px;">Ваши задачи хранятся в защищённом облаке. Мы не передаём данные третьим лицам.</p>
     <label class="checkbox-label">
@@ -97,8 +96,7 @@
       <div class="chat-container" id="chat-messages"></div>
     </section>
 
-    <!-- ПАМЯТЬ -->
-    <section id="tab-memory" class="tab">
+    <!-- ПАМЯТЬ -->    <section id="tab-memory" class="tab">
       <div class="toggle-fav" id="fav-toggle" onclick="window.toggleFavFilter()">
         <span><i class="fas fa-heart"></i> Только избранное</span>
         <div class="switch"></div>
@@ -147,21 +145,25 @@
       <input type="hidden" id="edit-id">
       <div class="form-group"><label>Название</label><input type="text" id="edit-title"></div>
       <div class="form-group"><label>Тип</label><select id="edit-notify-type"><option value="important">Важные</option><option value="brief">Краткие</option><option value="permanent">Постоянные</option></select></div>
-      <div class="form-group"><label>Дата и время</label><input type="datetime-local" id="edit-datetime"></div>
-      <div class="modal-actions"><button class="btn-cancel" onclick="window.closeModal()">Отмена</button><button class="btn-save" onclick="window.saveEdit()">Сохранить</button></div>
+      <div class="form-group"><label>Дата и время</label><input type="datetime-local" id="edit-datetime"></div>      <div class="modal-actions"><button class="btn-cancel" onclick="window.closeModal()">Отмена</button><button class="btn-save" onclick="window.saveEdit()">Сохранить</button></div>
     </div>
   </div>
 </div>
 
 <div id="toast"><i class="fas fa-check"></i> Готово</div>
 
+<!-- 🔧 СКРИПТЫ -->
 <script type="module" src="script.js"></script>
+
+<!-- 🔧 РЕГИСТРАЦИЯ SERVICE WORKER (исправлено для подпапки) -->
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then(() => console.log('SW registered'));
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js', { scope: './' })
+        .then(reg => console.log('✅ SW registered:', reg.scope))
+        .catch(err => console.log('❌ SW error:', err));
+    });
   }
 </script>
 </body>
 </html>
-<link rel="manifest" href="manifest.json">
