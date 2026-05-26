@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Умный блокнот — ИИ Помощник</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#10B981">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    * { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+    input, textarea { -webkit-user-select: text; user-select: text; }
+  </style>
+</head>
+<body>
+
+<!-- 🔐 АВТОРИЗАЦИЯ -->
+<div id="auth-screen" class="auth-container" style="display:flex;">
+  <div class="auth-card">
+    <div class="auth-icon"><i class="fas fa-lock"></i></div>
+    <h2 class="gradient-title">Вход в аккаунт</h2>
+    <div class="form-group"><label>Email</label><input type="email" id="auth-email" placeholder="name@example.com"></div>
+    <div class="form-group">
+      <label>Пароль</label>
+      <div class="password-wrapper">
+        <input type="password" id="auth-pass" placeholder="••••••••">
+        <button type="button" class="toggle-password" onclick="window.togglePasswordVisibility('auth-pass', this)"><i class="fas fa-eye"></i></button>
+      </div>
+    </div>
+    <div id="auth-error" class="error-text"></div>
+    <div style="display:flex; gap:10px;">
+      <button id="btn-login" class="btn-secondary" style="color:#10B981; flex:1;">Войти</button>
+      <button id="btn-register" class="btn-secondary" style="color:#A78BFA; flex:1;">Зарегистрироваться</button>
+    </div>
+    <div class="divider">или</div>
+    <button id="btn-google" class="btn-google"><i class="fab fa-google"></i> Войти через Google</button>
+    <button id="btn-support-auth" class="btn-support" style="margin-top:12px;"><i class="fas fa-headset"></i> Связаться с поддержкой</button>
+  </div>
+</div>
+
+<!-- 👤 ОНБОРДИНГ + СОГЛАСИЕ -->
+<div id="consent-screen" class="auth-container" style="display:none;">
+  <div class="auth-card">
+    <div class="auth-icon"><i class="fas fa-user-circle"></i></div>
+    <h2 class="gradient-title">Добро пожаловать!</h2>
+    <div class="form-group">
+      <label>Как вас зовут?</label>
+      <input type="text" id="user-name" placeholder="Ваше имя">
+    </div>
+    <p class="auth-text" style="margin-top:16px;">Ваши задачи хранятся в защищённом облаке. Мы не передаём данные третьим лицам.</p>
+    <label class="checkbox-label">
+      <input type="checkbox" id="agree-check">
+      <span>Я принимаю <a href="#" class="link">Условия</a> и <a href="#" class="link">Политику конфиденциальности</a></span>
+    </label>
+    <button id="btn-consent-next" class="btn-primary" disabled>Продолжить</button>
+  </div>
+</div>
+
+<!-- 🏠 ПРИЛОЖЕНИЕ -->
+<div id="app-wrapper" style="display:none;">
+  <header>
+    <div class="header-left">
+      <div id="header-icon"><i class="fas fa-home"></i></div>
+      <span id="page-title">Дом</span>
+    </div>
+    <div class="status-pill"><span class="status-dot"></span> Активен</div>
+  </header>
+
+  <main id="main-content">
+    <!-- ДОМ -->
+    <section id="tab-home" class="tab active">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-num" id="stat-active">0</div><div class="stat-label">Активных</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-done">0</div><div class="stat-label">Выполнено</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-remind">0</div><div class="stat-label">Напоминаний</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-notes">0</div><div class="stat-label">Заметок</div></div>
+      </div>
+      <div class="home-filters">
+        <div class="filter-chip active" data-filter="reminder" onclick="window.setHomeFilter('reminder')"><i class="fas fa-bell"></i> Напоминания</div>
+        <div class="filter-chip" data-filter="note" onclick="window.setHomeFilter('note')"><i class="fas fa-pencil-alt"></i> Заметки</div>
+      </div>
+      <div class="notify-tabs" id="notify-tabs-inline">
+        <button class="notify-tab active" data-filter="all" onclick="window.setNotifyFilter('all')">Все</button>
+        <button class="notify-tab" data-filter="important" onclick="window.setNotifyFilter('important')">Важные</button>
+        <button class="notify-tab" data-filter="brief" onclick="window.setNotifyFilter('brief')">Краткие</button>
+        <button class="notify-tab" data-filter="permanent" onclick="window.setNotifyFilter('permanent')">Постоянные</button>
+      </div>
+      <div class="info-banner" id="notify-info"><strong>Все:</strong> Активные напоминания.</div>
+      <div class="task-list" id="home-tasks"></div>
+    </section>
+
+    <!-- ЧАТ -->
+    <section id="tab-chat" class="tab">
+      <div class="chat-container" id="chat-messages"></div>
+    </section>
+
+    <!-- ПАМЯТЬ -->
+    <section id="tab-memory" class="tab">
+      <div class="toggle-fav" id="fav-toggle" onclick="window.toggleFavFilter()">
+        <span><i class="fas fa-heart"></i> Только избранное</span>
+        <div class="switch"></div>
+      </div>
+      <div class="category-list" id="memory-categories"></div>
+    </section>
+
+    <!-- НАСТРОЙКИ -->
+    <section id="tab-settings" class="tab">
+      <div class="category-item" onclick="window.exportData()">
+        <div class="cat-icon"><i class="fas fa-download"></i></div>
+        <div class="cat-name">Экспорт задач (JSON)</div>
+      </div>
+      <div class="category-item" onclick="window.openSupportApp()">
+        <div class="cat-icon"><i class="fas fa-headset"></i></div>
+        <div class="cat-name" style="color:#60A5FA">Связаться с поддержкой</div>
+      </div>
+      <div class="category-item" onclick="window.logoutUser()">
+        <div class="cat-icon"><i class="fas fa-sign-out-alt"></i></div>
+        <div class="cat-name" style="color:#EF4444">Выйти</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="input-bar" id="input-bar" style="display:none;">
+    <button id="voice-btn" style="width:44px;height:44px;border:none;border-radius:30px;background:var(--bg-relief);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;transition:all 0.2s;margin-right:8px;">
+      <i class="fas fa-microphone"></i>
+    </button>
+    <input type="text" id="chat-input" placeholder="Сообщение...">
+    <button id="send-btn"><i class="fas fa-paper-plane"></i></button>
+  </div>
+
+  <!-- НИЖНЯЯ НАВИГАЦИЯ -->
+  <nav>
+    <div class="nav-container">
+      <div class="nav-item active" data-tab="home"><i class="fas fa-home"></i><span>Дом</span></div>
+      <div class="nav-item" data-tab="chat"><i class="fas fa-comment-dots"></i><span>Чат</span></div>
+      <div class="nav-item" data-tab="memory"><i class="fas fa-brain"></i><span>Память</span></div>
+      <div class="nav-item" data-tab="settings"><i class="fas fa-cog"></i><span>Настройки</span></div>
+    </div>
+  </nav>
+
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal">
+      <h2>Редактировать задачу</h2>
+      <input type="hidden" id="edit-id">
+      <div class="form-group"><label>Название</label><input type="text" id="edit-title"></div>
+      <div class="form-group"><label>Тип</label><select id="edit-notify-type"><option value="important">Важные</option><option value="brief">Краткие</option><option value="permanent">Постоянные</option></select></div>
+      <div class="form-group"><label>Дата и время</label><input type="datetime-local" id="edit-datetime"></div>
+      <div class="modal-actions"><button class="btn-cancel" onclick="window.closeModal()">Отмена</button><button class="btn-save" onclick="window.saveEdit()">Сохранить</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><i class="fas fa-check"></i> Готово</div>
+
+<script src="script.js"></script>
+</body>
+</html>
