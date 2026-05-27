@@ -1,8 +1,8 @@
 // ==========================================
-// 🛡️ УТИЛИТЫ И ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+// 🛡️ FIREBASE ВЕРСИЯ (ВХОД + СВЕТЛАЯ ТЕМА + АВТОСОХРАНЕНИЕ)
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDocs, addDoc, deleteDoc, updateDoc, query, orderBy, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -18,6 +18,12 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
+
+// ==========================================
+// АВТОСОХРАНЕНИЕ СЕССИИ
+// ==========================================
+setPersistence(auth, browserLocalPersistence)
+  .catch((error) => console.error("Persistence error:", error));
 
 let firebaseUser = null;
 let currentUserName = "Друг";
@@ -37,6 +43,44 @@ const safeSet = (k, v) => {
   } catch(e) {} 
 };
 const haptic = ms => navigator.vibrate && navigator.vibrate(ms || 10);
+
+// ==========================================
+// 🎨 ТЕМА ОФОРМЛЕНИЯ
+// ==========================================
+function applyTheme(theme) {
+  const body = document.body;
+  const savedTheme = theme || safeGet('app_theme', 'dark');
+  
+  if (savedTheme === 'system') {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (isDark) {
+      body.classList.remove('light-theme');
+    } else {
+      body.classList.add('light-theme');
+    }
+  } else if (savedTheme === 'light') {
+    body.classList.add('light-theme');
+  } else {
+    body.classList.remove('light-theme');
+  }
+  
+  safeSet('app_theme', savedTheme);
+  return savedTheme;
+}
+
+function setupTheme() {
+  const themeSelect = document.getElementById('theme-select');
+  if (!themeSelect) return;
+  
+  const savedTheme = safeGet('app_theme', 'dark');
+  themeSelect.value = savedTheme;
+  applyTheme(savedTheme);
+  
+  themeSelect.onchange = () => {
+    const newTheme = themeSelect.value;
+    applyTheme(newTheme);
+  };
+}
 
 var tasks = safeGet('ai_tasks', []);
 var homeFilter = 'reminder';
@@ -688,12 +732,11 @@ window.exportData = function() {
   document.body.removeChild(a);
 };
 
-window.openSupportApp = function() {
-  haptic(15);
-  var phone = '+79800984901';
-  var message = 'Здравствуйте! Нужна помощь с ИИ Помощником';
-  var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
-  window.open(url, '_blank');
+window.contactSupport = function() {
+  haptic(30);
+  const phone = "+79800984901";
+  const url = `https://wa.me/${phone}?text=Здравствуйте!%20Нужна%20помощь%20с%20Умным%20блокнотом`;
+  setTimeout(() => window.location.href = url, 100);
 };
 
 function showToast() {
@@ -937,22 +980,23 @@ function setupFirebaseUI() {
   const loginBtn = $('btn-login');
   const registerBtn = $('btn-register');
   const googleBtn = $('btn-google');
-  const yandexBtn = $('btn-yandex');
   const authEmail = $('auth-email');
   const authPass = $('auth-pass');
+  const authError = $('auth-error');
 
   if (loginBtn) {
     loginBtn.onclick = async () => {
       const email = authEmail?.value.trim();
       const pass = authPass?.value;
-      if (!email || !pass) return showAuthError('Введите email и пароль');
+      if (!email || !pass) {
+        if (authError) authError.textContent = 'Введите email и пароль';
+        return;
+      }
       try {
-        showLoading(true);
         await signInWithEmailAndPassword(auth, email, pass);
+        if (authError) authError.textContent = '';
       } catch(err) {
-        showAuthError(err.message);
-      } finally {
-        showLoading(false);
+        if (authError) authError.textContent = err.message;
       }
     };
   }
@@ -961,15 +1005,19 @@ function setupFirebaseUI() {
     registerBtn.onclick = async () => {
       const email = authEmail?.value.trim();
       const pass = authPass?.value;
-      if (!email || !pass) return showAuthError('Введите email и пароль');
-      if (pass.length < 6) return showAuthError('Пароль минимум 6 символов');
+      if (!email || !pass) {
+        if (authError) authError.textContent = 'Введите email и пароль';
+        return;
+      }
+      if (pass.length < 6) {
+        if (authError) authError.textContent = 'Пароль минимум 6 символов';
+        return;
+      }
       try {
-        showLoading(true);
         await createUserWithEmailAndPassword(auth, email, pass);
+        if (authError) authError.textContent = '';
       } catch(err) {
-        showAuthError(err.message);
-      } finally {
-        showLoading(false);
+        if (authError) authError.textContent = err.message;
       }
     };
   }
@@ -977,50 +1025,109 @@ function setupFirebaseUI() {
   if (googleBtn) {
     googleBtn.onclick = async () => {
       try {
-        showLoading(true);
         await signInWithPopup(auth, googleProvider);
+        if (authError) authError.textContent = '';
       } catch(err) {
-        showAuthError('Ошибка Google входа: ' + err.message);
-      } finally {
-        showLoading(false);
+        if (authError) authError.textContent = err.message;
       }
     };
   }
+}
 
-  if (yandexBtn) {
-    yandexBtn.onclick = () => {
-      showAuthError('Вход через Яндекс скоро будет доступен');
-    };
+// ==========================================
+// МОДАЛКА "КАК ВОЙТИ"
+// ==========================================
+window.showHowToLogin = function() {
+  const modalHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:10000;display:flex;align-items:center;justify-content:center;">
+      <div style="background:#1f1f1f;border-radius:20px;padding:24px;max-width:340px;margin:20px;border:1px solid #333;width:100%;">
+        <h3 style="margin-bottom:16px;color:#10B981;">Как войти в приложение</h3>
+        <p style="color:#ddd;line-height:1.6;font-size:14.5px;">
+          • Через <strong>Email и пароль</strong><br>
+          • Через <strong>Google аккаунт</strong><br><br>
+          Если забыли пароль — напишите в поддержку.
+        </p>
+        <button onclick="this.closest('div[style*=\"position:fixed\"]').remove()" 
+                style="margin-top:20px;width:100%;padding:14px;background:#10B981;color:#000;border:none;border-radius:16px;font-weight:600;">
+          Понятно
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+// ==========================================
+// МОЙ АККАУНТ
+// ==========================================
+function renderMyAccount() {
+  const settingsTab = document.getElementById('tab-settings');
+  if (!settingsTab) return;
+
+  const user = firebaseUser;
+  const email = user ? (user.email || '—') : '—';
+  const photo = user && user.photoURL ? user.photoURL : 'https://via.placeholder.com/48/10B981/ffffff?text=👤';
+
+  const html = `
+    <div class="category-item" onclick="editUserName()" style="position:relative;">
+      <div class="cat-icon" style="background:none;padding:0;">
+        <img src="${photo}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #10B981;">
+      </div>
+      <div class="cat-name">
+        ${currentUserName}<br>
+        <small style="color:#888;font-size:12px;">${email}</small>
+      </div>
+      <div id="notification-badge" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);width:10px;height:10px;background:#EF4444;border-radius:50%;display:none;"></div>
+    </div>
+  `;
+
+  const oldBlock = settingsTab.querySelector('.category-item[onclick*="editUserName"]');
+  if (oldBlock) oldBlock.remove();
+
+  settingsTab.insertAdjacentHTML('afterbegin', html);
+}
+
+// ==========================================
+// РЕДАКТИРОВАНИЕ ИМЕНИ
+// ==========================================
+window.editUserName = function() {
+  const newName = prompt("Новое имя:", currentUserName);
+  if (!newName || !newName.trim()) return;
+
+  currentUserName = newName.trim();
+  
+  if (firebaseUser) {
+    updateProfile(firebaseUser, { displayName: currentUserName });
+    safeSet(`profile_${firebaseUser.uid}`, { name: currentUserName });
   }
-}
-
-function showAuthError(text) {
-  const err = $('auth-error');
-  if (err) {
-    err.textContent = text;
-    setTimeout(() => err.textContent = '', 5000);
-  }
-}
-
-function showLoading(show) {
-  console.log(show ? '⏳ Загрузка...' : '✅ Готово');
-}
+  
+  const accountBlock = document.querySelector('#tab-settings .category-item[onclick*="editUserName"]');
+  if (accountBlock) accountBlock.remove();
+  
+  renderMyAccount();
+  showToast();
+};
 
 // ==========================================
 // 👂 ОТСЛЕЖИВАНИЕ АВТОРИЗАЦИИ
 // ==========================================
 onAuthStateChanged(auth, async (user) => {
   firebaseUser = user;
+
   if (user) {
     const profile = safeGet(`profile_${user.uid}`, {});
     currentUserName = profile.name || user.displayName || user.email?.split('@')[0] || 'Пользователь';
 
     const loadedTasks = await loadTasksFromFirebase(user.uid);
-    if (loadedTasks.length > 0) tasks = loadedTasks;
+    if (loadedTasks.length > 0) {
+      tasks = loadedTasks;
+      safeSet('ai_tasks', tasks);
+    }
 
     if (localStorage.getItem('consent_accepted') === 'true') {
       showScreen('app-wrapper');
       initApp();
+      renderMyAccount();
     } else {
       showScreen('consent-screen');
     }
@@ -1032,96 +1139,29 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // ==========================================
-// НОВАЯ МОДАЛКА "КАК ВОЙТИ"
-// ==========================================
-window.showHowToLogin = function() {
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10000; 
-    display:flex; align-items:center; justify-content:center;
-  `;
-  
-  modal.innerHTML = `
-    <div style="background:#1a1a1a; border-radius:20px; padding:24px; max-width:340px; margin:20px; border:1px solid #333;">
-      <h3 style="margin-bottom:16px; color:#10B981;">Как войти в приложение</h3>
-      <p style="color:#ddd; line-height:1.6; font-size:14.5px;">
-        • Через <strong>Email и пароль</strong><br>
-        • Через <strong>Google аккаунт</strong><br>
-        • Через <strong>Яндекс аккаунт</strong> (скоро)<br><br>
-        Если забыли пароль — напишите в поддержку.
-      </p>
-      <button onclick="this.closest('.modal-overlay').remove()" 
-              style="margin-top:20px; width:100%; padding:12px; background:#10B981; color:#000; border:none; border-radius:16px; font-weight:600;">
-        Понятно
-      </button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-};
-
-// ==========================================
-// ПОДДЕРЖКА
-// ==========================================
-window.contactSupport = function(type) {
-  const phone = "+79800984901";
-  let url = '';
-  
-  if (type === 'whatsapp') {
-    url = `https://wa.me/${phone}?text=Здравствуйте!%20Нужна%20помощь%20с%20приложением%20Умный%20блокнот`;
-  } else if (type === 'max') {
-    url = `https://max мессенджер ссылка`;
-  }
-  
-  if (url) window.open(url, '_blank');
-};
-
-// ==========================================
-// МОЙ АККАУНТ В НАСТРОЙКАХ
-// ==========================================
-function renderMyAccount() {
-  const settingsTab = document.getElementById('tab-settings');
-  if (!settingsTab) return;
-
-  let accountHTML = `
-    <div class="category-item" onclick="editUserName()">
-      <div class="cat-icon"><i class="fas fa-user"></i></div>
-      <div class="cat-name">Мой аккаунт<br><small style="color:#777;">${currentUserName}</small></div>
-    </div>
-  `;
-
-  settingsTab.insertAdjacentHTML('afterbegin', accountHTML);
-}
-
-window.editUserName = function() {
-  const newName = prompt("Введите новое имя:", currentUserName);
-  if (newName && newName.trim() !== "") {
-    currentUserName = newName.trim();
-    if (firebaseUser) {
-      updateProfile(firebaseUser, { displayName: currentUserName });
-      safeSet(`profile_${firebaseUser.uid}`, { name: currentUserName });
-    }
-    const settingsTab = document.getElementById('tab-settings');
-    if (settingsTab) {
-      const existing = settingsTab.querySelector('.category-item');
-      if (existing) existing.remove();
-    }
-    renderMyAccount();
-    showToast();
-  }
-};
-
-// ==========================================
 // 🚀 ЗАПУСК
 // ==========================================
 window.onload = function() {
   setupFirebaseUI();
-
+  
+  const howToLoginBtn = $('#how-to-login');
+  if (howToLoginBtn) {
+    howToLoginBtn.onclick = () => window.showHowToLogin();
+  }
+  
+  const btnSupportAuth = $('#btn-support-auth');
+  if (btnSupportAuth) {
+    btnSupportAuth.onclick = () => window.contactSupport();
+  }
+  
   var agreeCheck = $('agree-check');
   var userNameInput = $('user-name');
   var btnConsent = $('btn-consent-next');
 
   function updateConsentButton() {
-    if (btnConsent) btnConsent.disabled = !(agreeCheck?.checked && userNameInput?.value.trim().length > 0);
+    var agreed = agreeCheck && agreeCheck.checked;
+    var nameFilled = userNameInput && userNameInput.value.trim().length > 0;
+    if (btnConsent) btnConsent.disabled = !(agreed && nameFilled);
   }
 
   if (agreeCheck) agreeCheck.onchange = updateConsentButton;
@@ -1135,30 +1175,23 @@ window.onload = function() {
       if (firebaseUser) {
         await updateProfile(firebaseUser, { displayName: n });
         safeSet(`profile_${firebaseUser.uid}`, { name: n });
+        currentUserName = n;
       }
       
-      currentUserName = n;
       localStorage.setItem('consent_accepted', 'true');
       
       showScreen('app-wrapper');
       initApp();
+      renderMyAccount();
     };
   }
 
-  var howToBtn = $('how-to-login');
-  if (howToBtn) {
-    howToBtn.onclick = function() {
-      window.showHowToLogin();
-    };
-  }
-
-  var btnSupportAuth = $('btn-support-auth');
-  var supportOpts = $('support-options');
-  if (btnSupportAuth && supportOpts) {
-    btnSupportAuth.onclick = function() {
-      supportOpts.style.display = supportOpts.style.display === 'flex' ? 'none' : 'flex';
-    };
-  }
+  setupTheme();
+  
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const savedTheme = safeGet('app_theme', 'dark');
+    if (savedTheme === 'system') applyTheme('system');
+  });
 
   showScreen('auth-screen');
 };
