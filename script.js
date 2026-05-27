@@ -936,6 +936,9 @@ function setupFirebaseUI() {
   const loginBtn = $('btn-login');
   const registerBtn = $('btn-register');
   const googleBtn = $('btn-google');
+  const yandexBtn = $('btn-yandex');
+  const telegramBtn = $('btn-telegram');
+  const maxBtn = $('btn-max');
   const authEmail = $('auth-email');
   const authPass = $('auth-pass');
   const authError = $('auth-error');
@@ -944,15 +947,14 @@ function setupFirebaseUI() {
     loginBtn.onclick = async () => {
       const email = authEmail?.value.trim();
       const pass = authPass?.value;
-      if (!email || !pass) {
-        if (authError) authError.textContent = 'Введите email и пароль';
-        return;
-      }
+      if (!email || !pass) return showAuthError('Введите email и пароль');
       try {
+        showLoading(true);
         await signInWithEmailAndPassword(auth, email, pass);
-        if (authError) authError.textContent = '';
       } catch(err) {
-        if (authError) authError.textContent = err.message;
+        showAuthError(err.message);
+      } finally {
+        showLoading(false);
       }
     };
   }
@@ -961,19 +963,15 @@ function setupFirebaseUI() {
     registerBtn.onclick = async () => {
       const email = authEmail?.value.trim();
       const pass = authPass?.value;
-      if (!email || !pass) {
-        if (authError) authError.textContent = 'Введите email и пароль';
-        return;
-      }
-      if (pass.length < 6) {
-        if (authError) authError.textContent = 'Пароль минимум 6 символов';
-        return;
-      }
+      if (!email || !pass) return showAuthError('Введите email и пароль');
+      if (pass.length < 6) return showAuthError('Пароль минимум 6 символов');
       try {
+        showLoading(true);
         await createUserWithEmailAndPassword(auth, email, pass);
-        if (authError) authError.textContent = '';
       } catch(err) {
-        if (authError) authError.textContent = err.message;
+        showAuthError(err.message);
+      } finally {
+        showLoading(false);
       }
     };
   }
@@ -981,13 +979,36 @@ function setupFirebaseUI() {
   if (googleBtn) {
     googleBtn.onclick = async () => {
       try {
+        showLoading(true);
         await signInWithPopup(auth, googleProvider);
-        if (authError) authError.textContent = '';
       } catch(err) {
-        if (authError) authError.textContent = err.message;
+        showAuthError('Ошибка Google входа: ' + err.message);
+      } finally {
+        showLoading(false);
       }
     };
   }
+
+  if (yandexBtn) {
+    yandexBtn.onclick = () => {
+      showAuthError('Вход через Яндекс скоро будет доступен');
+    };
+  }
+
+  if (telegramBtn) telegramBtn.onclick = () => window.open('https://t.me/твой_ник_бота', '_blank');
+  if (maxBtn) maxBtn.onclick = () => window.open('https://max мессенджер ссылка', '_blank');
+}
+
+function showAuthError(text) {
+  const err = $('auth-error');
+  if (err) {
+    err.textContent = text;
+    setTimeout(() => err.textContent = '', 5000);
+  }
+}
+
+function showLoading(show) {
+  console.log(show ? '⏳ Загрузка...' : '✅ Готово');
 }
 
 // ==========================================
@@ -997,19 +1018,17 @@ onAuthStateChanged(auth, async (user) => {
   firebaseUser = user;
   if (user) {
     const profile = safeGet(`profile_${user.uid}`, {});
-    if (!profile.name && user.displayName) {
-      profile.name = user.displayName;
-      safeSet(`profile_${user.uid}`, profile);
-    }
-    currentUserName = profile.name || user.email?.split('@')[0] || 'Пользователь';
-    
+    currentUserName = profile.name || user.displayName || user.email?.split('@')[0] || 'Пользователь';
+
     const loadedTasks = await loadTasksFromFirebase(user.uid);
-    if (loadedTasks.length > 0) {
-      tasks = loadedTasks;
-      safeSet('ai_tasks', tasks);
+    if (loadedTasks.length > 0) tasks = loadedTasks;
+
+    if (localStorage.getItem('consent_accepted') === 'true') {
+      showScreen('app-wrapper');
+      initApp();
+    } else {
+      showScreen('consent-screen');
     }
-    
-    showScreen('consent-screen');
   } else {
     firebaseUser = null;
     tasks = [];
@@ -1022,15 +1041,13 @@ onAuthStateChanged(auth, async (user) => {
 // ==========================================
 window.onload = function() {
   setupFirebaseUI();
-  
+
   var agreeCheck = $('agree-check');
   var userNameInput = $('user-name');
   var btnConsent = $('btn-consent-next');
 
   function updateConsentButton() {
-    var agreed = agreeCheck && agreeCheck.checked;
-    var nameFilled = userNameInput && userNameInput.value.trim().length > 0;
-    if (btnConsent) btnConsent.disabled = !(agreed && nameFilled);
+    if (btnConsent) btnConsent.disabled = !(agreeCheck?.checked && userNameInput?.value.trim().length > 0);
   }
 
   if (agreeCheck) agreeCheck.onchange = updateConsentButton;
@@ -1039,21 +1056,23 @@ window.onload = function() {
   if (btnConsent) {
     btnConsent.onclick = async () => {
       haptic(15);
-      var n = (userNameInput && userNameInput.value.trim()) || 'Пользователь';
+      var n = userNameInput?.value.trim() || 'Пользователь';
+      
       if (firebaseUser) {
         await updateProfile(firebaseUser, { displayName: n });
         safeSet(`profile_${firebaseUser.uid}`, { name: n });
-        currentUserName = n;
       }
+      
+      localStorage.setItem('consent_accepted', 'true');
+      currentUserName = n;
+      
       showScreen('app-wrapper');
       initApp();
     };
   }
 
   var btnSupportAuth = $('btn-support-auth');
-  if (btnSupportAuth) {
-    btnSupportAuth.onclick = () => window.openSupportApp();
-  }
+  if (btnSupportAuth) btnSupportAuth.onclick = () => window.openSupportApp();
 
   showScreen('auth-screen');
 };
