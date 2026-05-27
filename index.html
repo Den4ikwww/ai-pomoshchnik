@@ -33,23 +33,28 @@
     </div>
     <div id="auth-error" class="error-text"></div>
 
-    <button id="btn-login" class="btn-primary">Войти</button>
-    <button id="btn-register" class="btn-secondary">Зарегистрироваться</button>
+    <div style="display:flex; gap:10px; margin-bottom:12px;">
+      <button id="btn-login" class="btn-secondary" style="color:#10B981; flex:1;">Войти</button>
+      <button id="btn-register" class="btn-secondary" style="color:#A78BFA; flex:1;">Зарегистрироваться</button>
+    </div>
 
     <div class="divider">или</div>
 
     <button id="btn-google" class="btn-google"><i class="fab fa-google"></i> Через Google</button>
     <button id="btn-yandex" class="btn-google" style="background:#FFCC00;color:#000;margin-top:8px;"><i class="fab fa-yandex"></i> Через Яндекс</button>
-    
-    <div style="margin-top:16px; font-size:13px; color:var(--text-muted);">
-      Быстрый вход:
-    </div>
-    <button id="btn-telegram" class="btn-support" style="margin-top:8px;">Telegram</button>
-    <button id="btn-max" class="btn-support" style="margin-top:8px;">Макс</button>
 
-    <button id="btn-support-auth" class="btn-support" style="margin-top:20px;">
+    <button id="how-to-login" class="btn-support" style="margin-top:16px;">
+      <i class="fas fa-question-circle"></i> Как войти?
+    </button>
+
+    <button id="btn-support-auth" class="btn-support" style="margin-top:8px;">
       <i class="fas fa-headset"></i> Связаться с поддержкой
     </button>
+
+    <div id="support-options" style="display:none; margin-top:8px; flex-direction:column; gap:8px;">
+      <button onclick="contactSupport('whatsapp')" class="btn-support">WhatsApp</button>
+      <button onclick="contactSupport('max')" class="btn-support">Макс</button>
+    </div>
   </div>
 </div>
 
