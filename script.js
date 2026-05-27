@@ -38,44 +38,6 @@ const safeSet = (k, v) => {
 };
 const haptic = ms => navigator.vibrate && navigator.vibrate(ms || 10);
 
-// ==========================================
-// 🎨 ТЕМА ОФОРМЛЕНИЯ (ДОБАВЛЕНО)
-// ==========================================
-function applyTheme(theme) {
-  const body = document.body;
-  const savedTheme = theme || safeGet('app_theme', 'dark');
-  
-  if (savedTheme === 'system') {
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (isDark) {
-      body.classList.remove('light-theme');
-    } else {
-      body.classList.add('light-theme');
-    }
-  } else if (savedTheme === 'light') {
-    body.classList.add('light-theme');
-  } else {
-    body.classList.remove('light-theme');
-  }
-  
-  safeSet('app_theme', savedTheme);
-  return savedTheme;
-}
-
-function setupTheme() {
-  const themeSelect = document.getElementById('theme-select');
-  if (!themeSelect) return;
-  
-  const savedTheme = safeGet('app_theme', 'dark');
-  themeSelect.value = savedTheme;
-  applyTheme(savedTheme);
-  
-  themeSelect.onchange = () => {
-    const newTheme = themeSelect.value;
-    applyTheme(newTheme);
-  };
-}
-
 var tasks = safeGet('ai_tasks', []);
 var homeFilter = 'reminder';
 var showOldTasks = false;
@@ -1092,17 +1054,6 @@ window.onload = function() {
   if (btnSupportAuth) {
     btnSupportAuth.onclick = () => window.openSupportApp();
   }
-
-  // ===== НАСТРОЙКА ТЕМЫ (ДОБАВЛЕНО) =====
-  setupTheme();
-  
-  // Следим за изменением системной темы
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    const savedTheme = safeGet('app_theme', 'dark');
-    if (savedTheme === 'system') {
-      applyTheme('system');
-    }
-  });
 
   showScreen('auth-screen');
 };
