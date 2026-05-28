@@ -28,7 +28,38 @@ setPersistence(auth, browserLocalPersistence)
 let firebaseUser = null;
 let currentUserName = "Друг";
 
-const $ = id => document.getElementById(id);
+// ==========================================
+// 🔥 GLOBAL FUNCTIONS FOR INLINE ONCLICK — ЕДИНЫЙ БЛОК
+// ==========================================
+window.toggleDone = toggleDone;
+window.deleteToTrash = deleteToTrash;
+window.openEditModal = openEditModal;
+window.closeModal = closeModal;
+window.saveEdit = saveEdit;
+window.setHomeFilter = setHomeFilter;
+window.setNotifyFilter = setNotifyFilter;
+window.toggleFavFilter = toggleFavFilter;
+window.toggleCategoryFav = toggleCategoryFav;
+window.logoutUser = logoutUser;
+window.exportData = exportData;
+window.contactSupport = contactSupport;
+window.togglePasswordVisibility = togglePasswordVisibility;
+window.showHowToLogin = showHowToLogin;
+window.editUserName = editUserName;
+window.toggleVoiceInput = toggleVoiceInput;
+window.showPolicyModal = showPolicyModal;
+
+// ==========================================
+// 🔥 SAFE ELEMENT GETTER
+// ==========================================
+const $ = (id) => {
+  const el = document.getElementById(id);
+  if (!el) {
+    // console.warn(`⚠️ #${id} not found`);
+  }
+  return el;
+};
+
 const safeGet = (k, d) => { 
   try { 
     const v = localStorage.getItem(k); 
@@ -42,7 +73,11 @@ const safeSet = (k, v) => {
     localStorage.setItem(k, JSON.stringify(v)); 
   } catch(e) {} 
 };
-const haptic = ms => navigator.vibrate && navigator.vibrate(ms || 10);
+const haptic = ms => {
+  if (navigator.vibrate) {
+    navigator.vibrate(ms || 10);
+  }
+};
 
 // ==========================================
 // 🎨 ТЕМА ОФОРМЛЕНИЯ
@@ -70,27 +105,31 @@ function applyTheme(theme) {
 
 function setupTheme() {
   const themeSelect = document.getElementById('theme-select');
-  if (!themeSelect) return;
+  if (!themeSelect) {
+    console.warn('⚠️ #theme-select not found');
+    return;
+  }
   
   const savedTheme = safeGet('app_theme', 'dark');
   themeSelect.value = savedTheme;
   applyTheme(savedTheme);
   
-  themeSelect.onchange = () => {
-    const newTheme = themeSelect.value;
+  themeSelect.onchange = (e) => {
+    const newTheme = e.target.value;
     applyTheme(newTheme);
+    safeSet('app_theme', newTheme);
   };
 }
 
-var tasks = safeGet('ai_tasks', []);
-var homeFilter = 'reminder';
-var showOldTasks = false;
-var notifyFilter = 'all';
-var showFavoritesOnly = false;
-var awaitingTypeConfirm = null;
-var deletedItemsCount = safeGet('deleted_count', 0);
+let tasks = safeGet('ai_tasks', []);
+let homeFilter = 'reminder';
+let showOldTasks = false;
+let notifyFilter = 'all';
+let showFavoritesOnly = false;
+let awaitingTypeConfirm = null;
+let deletedItemsCount = safeGet('deleted_count', 0);
 
-var categories = [
+let categories = [
   {id:'passwords', name:'Пароли', fav:false},
   {id:'dates', name:'Даты', fav:false},
   {id:'notes', name:'Заметки', fav:false},
@@ -112,7 +151,7 @@ var categories = [
 
 safeSet('ai_categories', categories);
 
-var headerIcons = {
+let headerIcons = {
   home: '<i class="fas fa-home"></i>',
   chat: '<i class="fas fa-comment-dots"></i>',
   memory: '<i class="fas fa-brain"></i>',
@@ -146,7 +185,10 @@ async function syncTasksToFirebase(userId, tasksList) {
     }
     await batch.commit();
     console.log("✅ Задачи синхронизированы с Firebase");
-  } catch(e) { console.error("Ошибка синхронизации:", e); }
+  } catch(e) { 
+    console.error("Ошибка синхронизации:", e);
+    showToast();
+  }
 }
 
 async function loadTasksFromFirebase(userId) {
@@ -155,7 +197,7 @@ async function loadTasksFromFirebase(userId) {
     const tasksRef = collection(db, `users/${userId}/tasks`);
     const q = query(tasksRef, orderBy("createdAt", "desc"));
     const snapshot = await getDocs(q);
-    const loadedTasks = [];
+    let loadedTasks = [];
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       loadedTasks.push({
@@ -185,10 +227,10 @@ async function saveTasks() {
 // 📱 ЭКРАНЫ И ИНИЦИАЛИЗАЦИЯ
 // ==========================================
 function showScreen(id) {
-  var screens = ['auth-screen', 'consent-screen', 'app-wrapper'];
-  for (var i = 0; i < screens.length; i++) {
-    var s = screens[i];
-    var el = $(s);
+  let screens = ['auth-screen', 'consent-screen', 'app-wrapper'];
+  for (let i = 0; i < screens.length; i++) {
+    let s = screens[i];
+    let el = $(s);
     if (el) {
       if (id === s) {
         el.style.display = (s === 'app-wrapper') ? 'block' : 'flex';
@@ -208,36 +250,36 @@ function initApp() {
 }
 
 function initNav() {
-  var items = document.querySelectorAll('.nav-item');
-  for (var i = 0; i < items.length; i++) {
+  let items = document.querySelectorAll('.nav-item');
+  for (let i = 0; i < items.length; i++) {
     items[i].onclick = (function(btn) {
       return function() {
         haptic(15);
-        var allItems = document.querySelectorAll('.nav-item');
-        for (var j = 0; j < allItems.length; j++) {
+        let allItems = document.querySelectorAll('.nav-item');
+        for (let j = 0; j < allItems.length; j++) {
           allItems[j].classList.remove('active');
         }
-        var tabs = document.querySelectorAll('.tab');
-        for (var j = 0; j < tabs.length; j++) {
+        let tabs = document.querySelectorAll('.tab');
+        for (let j = 0; j < tabs.length; j++) {
           tabs[j].classList.remove('active');
         }
         btn.classList.add('active');
-        var tab = btn.getAttribute('data-tab');
-        var tabEl = document.getElementById('tab-' + tab);
+        let tab = btn.getAttribute('data-tab');
+        let tabEl = document.getElementById('tab-' + tab);
         if (tabEl) tabEl.classList.add('active');
         
-        var titles = {home:'Дом', chat:'Чат', memory:'Память', settings:'Настройки'};
-        var pageTitle = $('page-title');
+        let titles = {home:'Дом', chat:'Чат', memory:'Память', settings:'Настройки'};
+        let pageTitle = $('page-title');
         if (pageTitle && titles[tab]) {
           pageTitle.textContent = titles[tab];
         }
-        var headerIcon = $('header-icon');
+        let headerIcon = $('header-icon');
         if (headerIcon && headerIcons[tab]) {
           headerIcon.innerHTML = headerIcons[tab];
         }
         
-        var bar = $('input-bar');
-        var main = $('main-content');
+        let bar = $('input-bar');
+        let main = $('main-content');
         if (tab === 'chat') {
           if (bar) bar.style.display = 'flex';
           if (main) main.classList.add('chat-active');
@@ -250,19 +292,19 @@ function initNav() {
   }
 }
 
-window.setHomeFilter = function(type) {
+function setHomeFilter(type) {
   haptic(15);
   homeFilter = type;
-  var chips = document.querySelectorAll('.home-filters .filter-chip');
-  for (var i = 0; i < chips.length; i++) {
+  let chips = document.querySelectorAll('.home-filters .filter-chip');
+  for (let i = 0; i < chips.length; i++) {
     chips[i].classList.remove('active');
   }
-  var c = document.querySelector('.home-filters .filter-chip[data-filter="' + type + '"]');
+  let c = document.querySelector('.home-filters .filter-chip[data-filter="' + type + '"]');
   if (c) c.classList.add('active');
   showOldTasks = false;
   
-  var notifyTabs = document.getElementById('notify-tabs-inline');
-  var notifyInfo = $('notify-info');
+  let notifyTabs = document.getElementById('notify-tabs-inline');
+  let notifyInfo = $('notify-info');
   if (type === 'note') {
     if (notifyTabs) notifyTabs.style.display = 'none';
     if (notifyInfo) notifyInfo.style.display = 'none';
@@ -272,27 +314,27 @@ window.setHomeFilter = function(type) {
   }
   
   renderHome();
-};
+}
 
-window.setNotifyFilter = function(type) {
+function setNotifyFilter(type) {
   haptic(15);
   notifyFilter = type;
-  var tabs = document.querySelectorAll('.notify-tab');
-  for (var i = 0; i < tabs.length; i++) {
+  let tabs = document.querySelectorAll('.notify-tab');
+  for (let i = 0; i < tabs.length; i++) {
     tabs[i].classList.remove('active');
   }
-  var t = document.querySelector('.notify-tab[data-filter="' + type + '"]');
+  let t = document.querySelector('.notify-tab[data-filter="' + type + '"]');
   if (t) t.classList.add('active');
   
-  var infoText = '<strong>Все:</strong> Активные напоминания.';
+  let infoText = '<strong>Все:</strong> Активные напоминания.';
   if (type === 'important') infoText = '<strong>Важные:</strong> Двойное уведомление.';
   else if (type === 'brief') infoText = '<strong>Краткие:</strong> Исчезает через 24ч.';
   else if (type === 'permanent') infoText = '<strong>Постоянные:</strong> Ежедневно.';
   
-  var notifyInfo = $('notify-info');
+  let notifyInfo = $('notify-info');
   if (notifyInfo) notifyInfo.innerHTML = infoText;
   renderHome();
-};
+}
 
 function getNotifyLabel(type, hasDateTime) {
   if (!hasDateTime) return 'Заметка';
@@ -318,9 +360,9 @@ function formatDate(dt) {
 // ==========================================
 function updateStats() {
   if (!Array.isArray(tasks)) tasks = [];
-  var active = 0, done = 0, remind = 0, notes = 0;
-  for (var i = 0; i < tasks.length; i++) {
-    var t = tasks[i];
+  let active = 0, done = 0, remind = 0, notes = 0;
+  for (let i = 0; i < tasks.length; i++) {
+    let t = tasks[i];
     if (!t.deletedAt) {
       if (t.done) done++;
       else {
@@ -330,10 +372,10 @@ function updateStats() {
       }
     }
   }
-  var statActive = $('stat-active');
-  var statDone = $('stat-done');
-  var statRemind = $('stat-remind');
-  var statNotes = $('stat-notes');
+  let statActive = $('stat-active');
+  let statDone = $('stat-done');
+  let statRemind = $('stat-remind');
+  let statNotes = $('stat-notes');
   if (statActive) statActive.textContent = active;
   if (statDone) statDone.textContent = done;
   if (statRemind) statRemind.textContent = remind;
@@ -345,12 +387,12 @@ function renderHome() {
   
   updateStats();
 
-  var list = $('home-tasks');
+  let list = $('home-tasks');
   if (!list) return;
 
-  var vis = [];
-  for (var i = 0; i < tasks.length; i++) {
-    var t = tasks[i];
+  let vis = [];
+  for (let i = 0; i < tasks.length; i++) {
+    let t = tasks[i];
     if (t.deletedAt) continue;
     if (homeFilter === 'reminder') {
       if (t.datetime) vis.push(t);
@@ -360,8 +402,8 @@ function renderHome() {
   }
   
   if (homeFilter === 'reminder' && notifyFilter !== 'all') {
-    var filtered = [];
-    for (var i = 0; i < vis.length; i++) {
+    let filtered = [];
+    for (let i = 0; i < vis.length; i++) {
       if (vis[i].notifyType === notifyFilter && !vis[i].done) {
         filtered.push(vis[i]);
       }
@@ -373,12 +415,12 @@ function renderHome() {
     return new Date(b.created) - new Date(a.created);
   });
   
-  var weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-  var rec = [];
+  let weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+  let rec = [];
   if (showOldTasks) {
     rec = vis;
   } else {
-    for (var i = 0; i < vis.length; i++) {
+    for (let i = 0; i < vis.length; i++) {
       if (vis[i].created && new Date(vis[i].created).getTime() > weekAgo) {
         rec.push(vis[i]);
       }
@@ -389,18 +431,18 @@ function renderHome() {
     return;
   }
 
-  var html = '';
-  for (var i = 0; i < rec.length; i++) {
-    var t = rec[i];
-    var isDone = t.done;
-    var hasDateTime = t.datetime && t.datetime.length > 0;
-    var label = getNotifyLabel(t.notifyType, hasDateTime);
-    var tagClass = getNotifyColor(t.notifyType, hasDateTime);
-    var dateStr = formatDate(t.datetime);
-    var checkIcon = isDone ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '';
-    var doneClass = isDone ? ' completed' : '';
-    var checkedClass = isDone ? ' checked' : '';
-    var trashActiveClass = isDone ? ' trash-active' : '';
+  let html = '';
+  for (let i = 0; i < rec.length; i++) {
+    let t = rec[i];
+    let isDone = t.done;
+    let hasDateTime = t.datetime && t.datetime.length > 0;
+    let label = getNotifyLabel(t.notifyType, hasDateTime);
+    let tagClass = getNotifyColor(t.notifyType, hasDateTime);
+    let dateStr = formatDate(t.datetime);
+    let checkIcon = isDone ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '';
+    let doneClass = isDone ? ' completed' : '';
+    let checkedClass = isDone ? ' checked' : '';
+    let trashActiveClass = isDone ? ' trash-active' : '';
     
     html += '<div class="task-wrapper fade-in' + doneClass + '" data-id="' + t.id + '" style="animation-delay:' + (i * 0.05) + 's">';
     html += '  <div class="task-item' + doneClass + '">';
@@ -424,22 +466,24 @@ function renderHome() {
 
 function escapeHtml(str) {
   if (!str) return '';
-  return str.replace(/[&<>]/g, function(m) {
-    if (m === '&') return '&amp;';
-    if (m === '<') return '&lt;';
-    if (m === '>') return '&gt;';
-    return m;
-  });
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return str.replace(/[&<>"']/g, m => map[m]);
 }
 
 // ==========================================
 // 🗑️ ДЕЙСТВИЯ С КОРЗИНОЙ
 // ==========================================
 function initTrashActions() {
-  var trashIcons = document.querySelectorAll('.task-right');
-  for (var i = 0; i < trashIcons.length; i++) {
-    var trash = trashIcons[i];
-    var isDone = trash.getAttribute('data-done') === 'true';
+  let trashIcons = document.querySelectorAll('.task-right');
+  for (let i = 0; i < trashIcons.length; i++) {
+    let trash = trashIcons[i];
+    let isDone = trash.getAttribute('data-done') === 'true';
     
     trash.onclick = null;
     trash.onmousedown = null;
@@ -453,22 +497,22 @@ function initTrashActions() {
       trash.onclick = function(e) {
         e.stopPropagation();
         haptic(50);
-        var taskWrapper = this.closest('.task-wrapper');
+        let taskWrapper = this.closest('.task-wrapper');
         if (taskWrapper) {
-          var id = taskWrapper.getAttribute('data-id');
+          let id = taskWrapper.getAttribute('data-id');
           if (id) {
             deleteToTrash(id);
           }
         }
       };
     } else {
-      var timer = null;
+      let timer = null;
       
-      var makeActive = function(element) {
+      let makeActive = function(element) {
         element.classList.add('trash-active');
       };
       
-      var makeInactive = function(element) {
+      let makeInactive = function(element) {
         element.classList.remove('trash-active');
         if (timer) {
           clearTimeout(timer);
@@ -476,10 +520,10 @@ function initTrashActions() {
         }
       };
       
-      var handleDelete = function(element) {
-        var taskWrapper = element.closest('.task-wrapper');
+      let handleDelete = function(element) {
+        let taskWrapper = element.closest('.task-wrapper');
         if (taskWrapper) {
-          var id = taskWrapper.getAttribute('data-id');
+          let id = taskWrapper.getAttribute('data-id');
           if (id) {
             showCustomConfirm('Удалить задачу?', function() {
               deleteToTrash(id);
@@ -492,11 +536,10 @@ function initTrashActions() {
       trash.ontouchstart = function(e) {
         e.stopPropagation();
         makeActive(this);
-        timer = setTimeout(function(self) {
-          return function() {
-            handleDelete(self);
-          };
-        }(this), 500);
+        let self = this;
+        timer = setTimeout(function() {
+          handleDelete(self);
+        }, 500);
       };
       
       trash.ontouchend = function(e) {
@@ -511,11 +554,10 @@ function initTrashActions() {
       trash.onmousedown = function(e) {
         e.stopPropagation();
         makeActive(this);
-        timer = setTimeout(function(self) {
-          return function() {
-            handleDelete(self);
-          };
-        }(this), 500);
+        let self = this;
+        timer = setTimeout(function() {
+          handleDelete(self);
+        }, 500);
       };
       
       trash.onmouseup = function(e) {
@@ -534,28 +576,30 @@ function initTrashActions() {
 // 🔔 КАСТОМНОЕ ОКНО ПОДТВЕРЖДЕНИЯ
 // ==========================================
 function showCustomConfirm(message, onConfirm) {
-  var overlay = document.createElement('div');
+  let overlay = document.createElement('div');
   overlay.className = 'custom-confirm-overlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+  overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;z-index:10000;';
   
-  var dialog = document.createElement('div');
+  let dialog = document.createElement('div');
   dialog.className = 'custom-confirm-dialog';
-  dialog.style.cssText = 'background:#1a1a1a;border-radius:16px;padding:20px;min-width:250px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+  dialog.style.cssText = 'border-radius:16px;padding:20px;min-width:250px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
   
-  var text = document.createElement('p');
+  let text = document.createElement('p');
   text.textContent = message;
-  text.style.cssText = 'color:#4ade80;font-size:16px;margin-bottom:20px;font-family:system-ui,-apple-system,sans-serif;';
+  text.style.cssText = 'font-size:16px;margin-bottom:20px;font-family:system-ui,-apple-system,sans-serif;';
   
-  var buttonsDiv = document.createElement('div');
+  let buttonsDiv = document.createElement('div');
   buttonsDiv.style.cssText = 'display:flex;gap:12px;justify-content:center;';
   
-  var confirmBtn = document.createElement('button');
+  let confirmBtn = document.createElement('button');
   confirmBtn.textContent = 'Да';
-  confirmBtn.style.cssText = 'background:#4ade80;border:none;padding:8px 24px;border-radius:8px;color:#1a1a1a;font-weight:600;cursor:pointer;font-size:14px;transition:all 0.2s;';
+  confirmBtn.className = 'confirm-yes';
+  confirmBtn.style.cssText = 'padding:8px 24px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;transition:all 0.2s;';
   
-  var cancelBtn = document.createElement('button');
+  let cancelBtn = document.createElement('button');
   cancelBtn.textContent = 'Нет';
-  cancelBtn.style.cssText = 'background:#333;border:none;padding:8px 24px;border-radius:8px;color:#fff;cursor:pointer;font-size:14px;transition:all 0.2s;';
+  cancelBtn.className = 'confirm-no';
+  cancelBtn.style.cssText = 'padding:8px 24px;border-radius:8px;cursor:pointer;font-size:14px;transition:all 0.2s;';
   
   buttonsDiv.appendChild(confirmBtn);
   buttonsDiv.appendChild(cancelBtn);
@@ -584,10 +628,10 @@ function showCustomConfirm(message, onConfirm) {
 // ==========================================
 // 🗂️ ДЕЙСТВИЯ
 // ==========================================
-window.toggleDone = function(id, e) {
+function toggleDone(id, e) {
   if (e) e.stopPropagation();
   haptic(15);
-  for (var i = 0; i < tasks.length; i++) {
+  for (let i = 0; i < tasks.length; i++) {
     if (tasks[i].id === id) {
       tasks[i].done = !tasks[i].done;
       saveTasks();
@@ -595,12 +639,12 @@ window.toggleDone = function(id, e) {
       break;
     }
   }
-};
+}
 
-window.deleteToTrash = function(id) {
+function deleteToTrash(id) {
   haptic(50);
-  var newTasks = [];
-  for (var i = 0; i < tasks.length; i++) {
+  let newTasks = [];
+  for (let i = 0; i < tasks.length; i++) {
     if (tasks[i].id !== id) {
       newTasks.push(tasks[i]);
     }
@@ -610,27 +654,27 @@ window.deleteToTrash = function(id) {
   renderHome();
   renderMemory();
   showToast();
-};
+}
 
 // ==========================================
 // 🗂️ ПАМЯТЬ
 // ==========================================
-window.toggleFavFilter = function() {
+function toggleFavFilter() {
   haptic(15);
   showFavoritesOnly = !showFavoritesOnly;
-  var toggle = $('fav-toggle');
+  let toggle = $('fav-toggle');
   if (toggle) toggle.classList.toggle('active', showFavoritesOnly);
   renderMemory();
-};
+}
 
 function renderMemory() {
-  var memoryCategories = $('memory-categories');
+  let memoryCategories = $('memory-categories');
   if (!memoryCategories) return;
   
-  var f = showFavoritesOnly ? categories.filter(c => c.fav) : categories;
-  var html = '';
+  let f = showFavoritesOnly ? categories.filter(c => c.fav) : categories;
+  let html = '';
   
-  var icons = {
+  let icons = {
     'passwords': '🔐', 'dates': '📅', 'notes': '📝', 'addresses': '📍',
     'health': '💪', 'transport': '🚗', 'study': '📚', 'people': '👥',
     'pets': '🐾', 'ideas': '💡', 'favorites': '⭐', 'home': '🏠',
@@ -638,10 +682,10 @@ function renderMemory() {
     'deleted': '🗑️'
   };
   
-  for (var i = 0; i < f.length; i++) {
-    var c = f[i];
-    var likedClass = c.fav ? ' liked' : '';
-    var icon = icons[c.id] || '📌';
+  for (let i = 0; i < f.length; i++) {
+    let c = f[i];
+    let likedClass = c.fav ? ' liked' : '';
+    let icon = icons[c.id] || '📌';
     
     html += '<div class="category-item">';
     html += '  <div class="cat-icon">' + icon + '</div>';
@@ -652,10 +696,10 @@ function renderMemory() {
   memoryCategories.innerHTML = html;
 }
 
-window.toggleCategoryFav = function(id, e) {
+function toggleCategoryFav(id, e) {
   if (e) e.stopPropagation();
   haptic(15);
-  for (var i = 0; i < categories.length; i++) {
+  for (let i = 0; i < categories.length; i++) {
     if (categories[i].id === id) {
       categories[i].fav = !categories[i].fav;
       safeSet('ai_categories', categories);
@@ -663,15 +707,15 @@ window.toggleCategoryFav = function(id, e) {
       break;
     }
   }
-};
+}
 
 // ==========================================
 // 🛠️ МОДАЛКА И УТИЛИТЫ
 // ==========================================
-window.openEditModal = function(id) {
+function openEditModal(id) {
   haptic(15);
-  var t = null;
-  for (var i = 0; i < tasks.length; i++) {
+  let t = null;
+  for (let i = 0; i < tasks.length; i++) {
     if (tasks[i].id === id) { t = tasks[i]; break; }
   }
   if (!t) return;
@@ -681,22 +725,29 @@ window.openEditModal = function(id) {
   $('edit-notify-type').value = t.notifyType || 'important';
   $('edit-datetime').value = t.datetime || '';
   $('edit-modal').classList.add('active');
-};
+}
 
-window.closeModal = function() {
+function closeModal() {
   haptic(10);
-  $('edit-modal').classList.remove('active');
-};
+  const modal = $('edit-modal');
+  if (modal) {
+    modal.classList.remove('active');
+    if (window.__modalEscapeHandler) {
+      document.removeEventListener('keydown', window.__modalEscapeHandler);
+      window.__modalEscapeHandler = null;
+    }
+  }
+}
 
-window.saveEdit = function() {
-  var id = $('edit-id').value;
+function saveEdit() {
+  let id = $('edit-id').value;
   if (!id) return;
   
-  var newTitle = $('edit-title').value || 'Без названия';
-  var newNotifyType = $('edit-notify-type').value || 'important';
-  var newDatetime = $('edit-datetime').value || '';
+  let newTitle = $('edit-title').value || 'Без названия';
+  let newNotifyType = $('edit-notify-type').value || 'important';
+  let newDatetime = $('edit-datetime').value || '';
   
-  for (var i = 0; i < tasks.length; i++) {
+  for (let i = 0; i < tasks.length; i++) {
     if (tasks[i].id === id) {
       tasks[i].title = newTitle;
       tasks[i].notifyType = newNotifyType;
@@ -709,38 +760,52 @@ window.saveEdit = function() {
   saveTasks();
   renderHome();
   closeModal();
-};
+}
 
-window.logoutUser = function() {
+function logoutUser() {
   haptic(50);
   showCustomConfirm('Выйти из аккаунта?', function() {
-    localStorage.clear();
+    const savedTheme = localStorage.getItem('app_theme');
+    
+    const keysToKeep = ['app_theme', 'consent_accepted'];
+    const allKeys = Object.keys(localStorage);
+    for (const key of allKeys) {
+      if (!keysToKeep.includes(key)) {
+        localStorage.removeItem(key);
+      }
+    }
+    
     tasks = [];
     firebaseUser = null;
+    
+    if (savedTheme) {
+      localStorage.setItem('app_theme', savedTheme);
+    }
+    
     showScreen('auth-screen');
   });
-};
+}
 
-window.exportData = function() {
+function exportData() {
   haptic(20);
   if (tasks.length === 0) { alert('Нет задач'); return; }
-  var a = document.createElement('a');
+  let a = document.createElement('a');
   a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tasks, null, 2));
   a.download = 'backup_' + Date.now() + '.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-};
+}
 
-window.contactSupport = function() {
+function contactSupport() {
   haptic(30);
   const phone = "+79800984901";
   const url = `https://wa.me/${phone}?text=Здравствуйте!%20Нужна%20помощь%20с%20Умным%20блокнотом`;
   setTimeout(() => window.location.href = url, 100);
-};
+}
 
 function showToast() {
-  var t = $('toast');
+  let t = $('toast');
   if (t) {
     t.classList.add('show');
     setTimeout(function() { t.classList.remove('show'); }, 2000);
@@ -750,15 +815,15 @@ function showToast() {
 // ==========================================
 // 💬 ЧАТ
 // ==========================================
-var voiceRecording = false;
-var mediaRecorder = null;
-var audioChunks = [];
-var chatInput = null;
-var chatMessages = null;
+let voiceRecording = false;
+let mediaRecorder = null;
+let audioChunks = [];
+let chatInput = null;
+let chatMessages = null;
 
 function addMessage(txt, s) {
   if (!chatMessages) return;
-  var d = document.createElement('div');
+  let d = document.createElement('div');
   d.className = 'message ' + s;
   d.innerHTML = '<div class="bubble fade-in">' + txt + '</div>';
   chatMessages.appendChild(d);
@@ -771,29 +836,29 @@ function toSafeStr(t) { return String(t || '').toLowerCase().trim(); }
 
 function parseUserInput(text) {
   try {
-    var l = toSafeStr(text);
-    var d = new Date();
-    var c = text;
-    var hasDate = false, hasTime = false, h = 0, m = 0;
+    let l = toSafeStr(text);
+    let d = new Date();
+    let c = text;
+    let hasDate = false, hasTime = false, h = 0, m = 0;
     
     if (l.indexOf('послезавтра') !== -1) { d.setDate(d.getDate() + 2); c = c.replace(/послезавтра/gi, ''); hasDate = true; } 
     else if (l.indexOf('завтра') !== -1) { d.setDate(d.getDate() + 1); c = c.replace(/завтра/gi, ''); hasDate = true; }
     
-    var tm = l.match(/(\d{1,2})[.:](\d{2})/);
+    let tm = l.match(/(?:в|на|к)?\s*(\d{1,2})[.:](\d{2})/);
     if (tm) { h = parseInt(tm[1]); m = parseInt(tm[2]); if (h >= 0 && h < 24 && m >= 0 && m < 60) { d.setHours(h, m, 0, 0); hasTime = true; } }
     
-    if (hasTime && !hasDate) { var now = new Date(); var taskTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0); if (taskTime < now) { d.setDate(d.getDate() + 1); d.setHours(h, m, 0, 0); } hasDate = true; }
+    if (hasTime && !hasDate) { let now = new Date(); let taskTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0); if (taskTime < now) { d.setDate(d.getDate() + 1); d.setHours(h, m, 0, 0); } hasDate = true; }
     if (hasDate && !hasTime) { d.setHours(9, 0, 0, 0); }
     if (!hasDate && !hasTime) { return {dt: null, title: text}; }
     
-    var y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, '0'), da = String(d.getDate()).padStart(2, '0'), hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
+    let y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, '0'), da = String(d.getDate()).padStart(2, '0'), hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
     c = c.trim(); if (c.length > 0) { c = c.charAt(0).toUpperCase() + c.slice(1); } else { c = "Задача"; }
     return {dt: y + '-' + mo + '-' + da + 'T' + hh + ':' + mi, title: c};
   } catch(e) { return {dt: null, title: String(text)}; }
 }
 
 function detectType(t) {
-  var l = toSafeStr(t);
+  let l = toSafeStr(t);
   if (l.indexOf('постоянно') !== -1 || l.indexOf('каждый') !== -1) return 'permanent';
   if (l.indexOf('важно') !== -1 || l.indexOf('врач') !== -1) return 'important';
   return 'unknown';
@@ -802,7 +867,7 @@ function detectType(t) {
 function processUserMessage(text) {
   addMessage(text, 'user');
   
-  var lower = toSafeStr(text);
+  let lower = toSafeStr(text);
   
   if (lower.indexOf('привет') !== -1 || lower.indexOf('здравствуй') !== -1 || lower.indexOf('добрый') !== -1 || lower.indexOf('hi') !== -1) {
     addMessage('Привет! 👋 Напиши задачу, например:<br>"Завтра в 18.00 полить цветы"', 'ai');
@@ -823,13 +888,13 @@ function processUserMessage(text) {
     return;
   }
   
-  var p = parseUserInput(text);
-  var type = 'note', cat = '';
+  let p = parseUserInput(text);
+  let type = 'note', cat = '';
   if (p.dt || lower.indexOf('напомн') !== -1) { type = 'reminder'; cat = 'Напоминание'; }
   else if (lower.indexOf('пароль') !== -1 || lower.indexOf('идея') !== -1) { type = 'note'; cat = lower.indexOf('пароль') !== -1 ? 'Безопасность' : 'Личное'; }
   
-  var nType = detectType(text);
-  var task = {
+  let nType = detectType(text);
+  let task = {
     id: String(Date.now()), title: p.title || text, type: type,
     notifyType: nType === 'unknown' ? 'brief' : nType, category: cat,
     datetime: p.dt, created: new Date().toISOString(), done: false, deletedAt: null
@@ -850,7 +915,7 @@ function processUserMessage(text) {
 
 function handleSend() {
   if (!chatInput) return;
-  var text = chatInput.value.trim();
+  let text = chatInput.value.trim();
   if (!text) return;
   processUserMessage(text);
   chatInput.value = '';
@@ -870,47 +935,70 @@ function toggleVoiceInput() {
 function startVoiceInput() {
   haptic(15);
   
-  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   
-  if (SpeechRecognition) {
+  if (!SpeechRecognition) {
+    addMessage('🎤 Голосовой ввод не поддерживается. Попробуйте Chrome или Яндекс.Браузер.', 'ai');
+    updateVoiceButton();
+    return;
+  }
+  
+  const checkMic = async () => {
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        const result = await navigator.permissions.query({ name: 'microphone' });
+        if (result.state === 'denied') {
+          addMessage('🔇 Разрешите доступ к микрофону в настройках браузера.', 'ai');
+          updateVoiceButton();
+          return;
+        }
+      }
+      startRecognition();
+    } catch { startRecognition(); }
+  };
+  
+  const startRecognition = () => {
     voiceRecording = true;
     updateVoiceButton();
     
-    var recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognition();
     recognition.lang = 'ru-RU';
     recognition.interimResults = false;
     recognition.continuous = false;
     
-    recognition.onresult = function(event) {
-      var transcript = event.results[0][0].transcript;
-      if (transcript) {
-        processUserMessage(transcript);
-      }
+    recognition.onstart = () => addMessage('🎤 Слушаю...', 'ai');
+    
+    recognition.onresult = (e) => {
+      const text = e.results[0][0].transcript.trim();
+      if (text) processUserMessage(text);
     };
     
-    recognition.onerror = function(event) {
+    recognition.onerror = (e) => {
       voiceRecording = false;
       updateVoiceButton();
-      
-      if (event.error === 'no-speech') {
-        addMessage('🎤 Ничего не услышано', 'ai');
-      } else if (event.error === 'not-allowed') {
-        alert('Доступ к микрофону запрещён. Разрешите в настройках браузера.');
-      } else if (event.error !== 'aborted') {
-        addMessage('🎤 Ошибка: ' + event.error, 'ai');
-      }
+      const msgs = {
+        'no-speech': '🎤 Ничего не услышано. Говорите громче.',
+        'not-allowed': '🔇 Доступ к микрофону запрещён.',
+        'audio-capture': '🎤 Ошибка микрофона. Проверьте устройство.',
+        'network': '🌐 Ошибка сети.'
+      };
+      addMessage(msgs[e.error] || `🎤 Ошибка: ${e.error}`, 'ai');
     };
     
-    recognition.onend = function() {
+    recognition.onend = () => {
       voiceRecording = false;
       updateVoiceButton();
     };
     
-    recognition.start();
-    
-  } else {
-    alert('Голосовой ввод не поддерживается в этом браузере');
-  }
+    try { recognition.start(); }
+    catch { 
+      voiceRecording = false; 
+      updateVoiceButton();
+      addMessage('🎤 Не удалось запустить. Попробуйте ещё раз.', 'ai');
+    }
+  };
+  
+  checkMic();
 }
 
 function stopVoiceInput() {
@@ -922,30 +1010,43 @@ function stopVoiceInput() {
 }
 
 function updateVoiceButton() {
-  var voiceBtn = $('voice-btn');
-  if (voiceBtn) {
-    if (voiceRecording) {
-      voiceBtn.innerHTML = '<i class="fas fa-stop"></i>';
-      voiceBtn.style.background = '#EF4444';
-      voiceBtn.style.color = '#fff';
-    } else {
-      voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
-      voiceBtn.style.background = 'var(--bg-relief)';
-      voiceBtn.style.color = 'var(--text-muted)';
-    }
+  const btn = $('voice-btn');
+  if (!btn) return;
+  
+  if (voiceRecording) {
+    btn.innerHTML = '<i class="fas fa-stop"></i>';
+    btn.style.background = '#EF4444';
+    btn.style.color = '#fff';
+    btn.classList.add('voice-recording');
+  } else {
+    btn.innerHTML = '<i class="fas fa-microphone"></i>';
+    btn.style.background = 'var(--bg-relief)';
+    btn.style.color = 'var(--text-muted)';
+    btn.classList.remove('voice-recording');
   }
 }
 
 function setupChat() {
   chatInput = $('chat-input');
   chatMessages = $('chat-messages');
-  var sendBtn = $('send-btn');
-  var voiceBtn = $('voice-btn');
+  let sendBtn = $('send-btn');
+  let voiceBtn = $('voice-btn');
   
-  var userName = 'Пользователь';
+  let clearChatBtn = $('#clear-chat-btn');
+  if (clearChatBtn) {
+    clearChatBtn.onclick = () => {
+      if (confirm('Очистить всю историю чата?')) {
+        if (chatMessages) chatMessages.innerHTML = '';
+        localStorage.removeItem('chat_history');
+        addMessage('🧹 История чата очищена', 'ai');
+      }
+    };
+  }
+  
+  let userName = 'Пользователь';
   if (firebaseUser && firebaseUser.displayName) userName = firebaseUser.displayName;
   
-  if (chatMessages) {
+  if (chatMessages && chatMessages.children.length === 0) {
     chatMessages.innerHTML = '<div class="message ai"><div class="bubble">Привет, ' + userName + '! 👋 Я готов к работе.</div></div>';
   }
   
@@ -960,8 +1061,8 @@ function setupChat() {
 // ==========================================
 // 🔑 ФУНКЦИЯ TOGGLE ПАРОЛЯ
 // ==========================================
-window.togglePasswordVisibility = function(inputId, btn) {
-  var input = document.getElementById(inputId);
+function togglePasswordVisibility(inputId, btn) {
+  let input = document.getElementById(inputId);
   if (input) {
     if (input.type === 'password') {
       input.type = 'text';
@@ -971,7 +1072,7 @@ window.togglePasswordVisibility = function(inputId, btn) {
       btn.innerHTML = '<i class="fas fa-eye"></i>';
     }
   }
-};
+}
 
 // ==========================================
 // 🔥 FIREBASE АВТОРИЗАЦИЯ
@@ -1037,25 +1138,97 @@ function setupFirebaseUI() {
 // ==========================================
 // МОДАЛКА "КАК ВОЙТИ"
 // ==========================================
-window.showHowToLogin = function() {
-  const modalHTML = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:10000;display:flex;align-items:center;justify-content:center;">
-      <div style="background:#1f1f1f;border-radius:20px;padding:24px;max-width:340px;margin:20px;border:1px solid #333;width:100%;">
-        <h3 style="margin-bottom:16px;color:#10B981;">Как войти в приложение</h3>
-        <p style="color:#ddd;line-height:1.6;font-size:14.5px;">
-          • Через <strong>Email и пароль</strong><br>
-          • Через <strong>Google аккаунт</strong><br><br>
-          Если забыли пароль — напишите в поддержку.
-        </p>
-        <button onclick="this.closest('div[style*=\"position:fixed\"]').remove()" 
-                style="margin-top:20px;width:100%;padding:14px;background:#10B981;color:#000;border:none;border-radius:16px;font-weight:600;">
-          Понятно
-        </button>
-      </div>
+function showHowToLogin() {
+  document.querySelector('.howto-overlay')?.remove();
+  
+  const overlay = document.createElement('div');
+  overlay.className = 'howto-overlay policy-overlay';
+  overlay.innerHTML = `
+    <div class="policy-content">
+      <h3 style="margin-bottom:16px;">Как войти в приложение</h3>
+      <p style="color:var(--text-main);line-height:1.6;font-size:14.5px;">
+        • Через <strong>Email и пароль</strong><br>
+        • Через <strong>Google аккаунт</strong><br><br>
+        Если забыли пароль — напишите в поддержку.
+      </p>
+      <button class="policy-btn">Понятно</button>
     </div>
   `;
-  document.body.insertAdjacentHTML('beforeend', modalHTML);
-};
+  
+  document.body.appendChild(overlay);
+  
+  const close = () => {
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.remove(), 200);
+  };
+  
+  overlay.querySelector('.policy-btn').onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  document.addEventListener('keydown', function onEsc(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); }
+  }, { once: false });
+}
+
+// ==========================================
+// МОДАЛКА ПОЛИТИКИ / УСЛОВИЙ
+// ==========================================
+function showPolicyModal(type) {
+  haptic(15);
+  
+  const content = {
+    terms: {
+      title: 'Условия использования',
+      text: `
+        <p>1. Вы используете приложение на свой страх и риск.</p>
+        <p>2. Данные синхронизируются с вашим аккаунтом Firebase.</p>
+        <p>3. Мы не продаём и не передаём ваши данные третьим лицам.</p>
+        <p>4. Вы можете экспортировать или удалить свои данные в любой момент.</p>
+        <p class="text-muted" style="margin-top:12px;font-size:12px;">Версия 1.0 от ${new Date().toLocaleDateString('ru')}</p>
+      `
+    },
+    privacy: {
+      title: 'Политика конфиденциальности',
+      text: `
+        <p>1. Мы собираем только email и имя для авторизации.</p>
+        <p>2. Ваши задачи хранятся в защищённой базе Firebase.</p>
+        <p>3. Голосовые данные обрабатываются локально в браузере.</p>
+        <p>4. Вы можете запросить удаление всех данных через поддержку.</p>
+        <p class="text-muted" style="margin-top:12px;font-size:12px;">Версия 1.0 от ${new Date().toLocaleDateString('ru')}</p>
+      `
+    }
+  };
+  
+  const data = content[type] || content.terms;
+  
+  const overlay = document.createElement('div');
+  overlay.className = 'policy-overlay';
+  
+  overlay.innerHTML = `
+    <div class="policy-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;">${data.title}</h3>
+        <button class="policy-close">&times;</button>
+      </div>
+      <div>${data.text}</div>
+      <button class="policy-btn">Понятно</button>
+    </div>
+  `;
+  
+  document.body.appendChild(overlay);
+  
+  const close = () => {
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.remove(), 200);
+    document.removeEventListener('keydown', onEscape);
+  };
+  
+  const onEscape = (e) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onEscape);
+  
+  overlay.querySelector('.policy-close').onclick = close;
+  overlay.querySelector('.policy-btn').onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+}
 
 // ==========================================
 // МОЙ АККАУНТ
@@ -1090,7 +1263,7 @@ function renderMyAccount() {
 // ==========================================
 // РЕДАКТИРОВАНИЕ ИМЕНИ
 // ==========================================
-window.editUserName = function() {
+function editUserName() {
   const newName = prompt("Новое имя:", currentUserName);
   if (!newName || !newName.trim()) return;
 
@@ -1106,7 +1279,7 @@ window.editUserName = function() {
   
   renderMyAccount();
   showToast();
-};
+}
 
 // ==========================================
 // 👂 ОТСЛЕЖИВАНИЕ АВТОРИЗАЦИИ
@@ -1146,21 +1319,21 @@ window.onload = function() {
   
   const howToLoginBtn = $('#how-to-login');
   if (howToLoginBtn) {
-    howToLoginBtn.onclick = () => window.showHowToLogin();
+    howToLoginBtn.onclick = () => showHowToLogin();
   }
   
   const btnSupportAuth = $('#btn-support-auth');
   if (btnSupportAuth) {
-    btnSupportAuth.onclick = () => window.contactSupport();
+    btnSupportAuth.onclick = () => contactSupport();
   }
   
-  var agreeCheck = $('agree-check');
-  var userNameInput = $('user-name');
-  var btnConsent = $('btn-consent-next');
+  let agreeCheck = $('agree-check');
+  let userNameInput = $('user-name');
+  let btnConsent = $('btn-consent-next');
 
   function updateConsentButton() {
-    var agreed = agreeCheck && agreeCheck.checked;
-    var nameFilled = userNameInput && userNameInput.value.trim().length > 0;
+    let agreed = agreeCheck && agreeCheck.checked;
+    let nameFilled = userNameInput && userNameInput.value.trim().length > 0;
     if (btnConsent) btnConsent.disabled = !(agreed && nameFilled);
   }
 
@@ -1170,7 +1343,7 @@ window.onload = function() {
   if (btnConsent) {
     btnConsent.onclick = async () => {
       haptic(15);
-      var n = (userNameInput && userNameInput.value.trim()) || 'Пользователь';
+      let n = (userNameInput && userNameInput.value.trim()) || 'Пользователь';
       
       if (firebaseUser) {
         await updateProfile(firebaseUser, { displayName: n });
@@ -1192,6 +1365,20 @@ window.onload = function() {
     const savedTheme = safeGet('app_theme', 'dark');
     if (savedTheme === 'system') applyTheme('system');
   });
+
+  const modal = $('edit-modal');
+  if (modal) {
+    modal.onclick = (e) => {
+      if (e.target === modal) closeModal();
+    };
+    
+    window.__modalEscapeHandler = (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('active')) {
+        closeModal();
+      }
+    };
+    document.addEventListener('keydown', window.__modalEscapeHandler);
+  }
 
   showScreen('auth-screen');
 };

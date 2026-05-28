@@ -1105,6 +1105,103 @@ nav {
   transform: scale(0.95);
 }
 
+.light-theme .custom-confirm-dialog {
+  background: var(--bg-card);
+  border-color: var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.light-theme .custom-confirm-dialog p {
+  color: var(--green);
+}
+
+.light-theme .confirm-no {
+  background: var(--bg-relief);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
+/* ПОЛИТИКА / УСЛОВИЯ МОДАЛКА */
+.policy-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.light-theme .policy-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.policy-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.policy-content h3 {
+  margin-bottom: 16px;
+  color: var(--green);
+}
+
+.policy-content p {
+  color: var(--text-main);
+  line-height: 1.6;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.policy-content .text-muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.policy-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.policy-close:hover {
+  color: var(--text-main);
+}
+
+.policy-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--green);
+  color: #000;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: opacity 0.2s;
+}
+
+.light-theme .policy-btn {
+  background: var(--green);
+  color: #fff;
+}
+
+.policy-btn:active {
+  opacity: 0.9;
+}
+
 /* ТОСТ */
 #toast {
   position: fixed;
@@ -1134,6 +1231,7 @@ nav {
 .light-theme #toast {
   background: var(--green);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 /* ТЕГИ */
@@ -1178,4 +1276,42 @@ nav {
 
 .light-theme ::-webkit-scrollbar-thumb {
   background: var(--green);
+}
+
+/* Плейсхолдеры */
+::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.light-theme ::placeholder {
+  color: var(--text-muted);
+}
+
+/* Отключённые элементы */
+input:disabled, select:disabled, textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Анимация пульсации для голосовой кнопки */
+@keyframes pulse-recording {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+}
+
+.voice-recording {
+  animation: pulse-recording 1.5s infinite;
+}
+
+/* Плавный переход темы для всех элементов */
+body, 
+.auth-card, .modal, .task-item, .category-item, 
+.stat-card, .filter-chip, .notify-tab,
+header, nav, .input-bar, .chat-container,
+.custom-confirm-dialog, .policy-content {
+  transition: background-color 0.25s ease, 
+              border-color 0.25s ease, 
+              color 0.25s ease,
+              box-shadow 0.25s ease;
 }

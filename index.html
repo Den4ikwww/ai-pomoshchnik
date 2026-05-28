@@ -14,6 +14,14 @@
     * { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
     input, textarea { -webkit-user-select: text; user-select: text; }
   </style>
+  <script>
+    (function() {
+      const t = localStorage.getItem('app_theme');
+      if (t === 'light' || (t === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.body.classList.add('light-theme');
+      }
+    })();
+  </script>
 </head>
 <body>
 
@@ -50,11 +58,6 @@
     <button id="btn-support-auth" class="btn-support" style="margin-top:8px;">
       <i class="fas fa-headset"></i> Связаться с поддержкой
     </button>
-
-    <div id="support-options" style="display:none; margin-top:8px; flex-direction:column; gap:8px;">
-      <button onclick="contactSupport('whatsapp')" class="btn-support">WhatsApp</button>
-      <button onclick="contactSupport('max')" class="btn-support">Макс</button>
-    </div>
   </div>
 </div>
 
@@ -65,12 +68,12 @@
     <h2 class="gradient-title">Добро пожаловать!</h2>
     <div class="form-group">
       <label>Как вас зовут?</label>
-      <input type="text" id="user-name" placeholder="Ваше имя">
+      <input type="text" id="user-name" placeholder="Ваше имя" autocomplete="off">
     </div>
     <p class="auth-text" style="margin-top:16px;">Ваши задачи хранятся в защищённом облаке. Мы не передаём данные третьим лицам.</p>
     <label class="checkbox-label">
       <input type="checkbox" id="agree-check">
-      <span>Я принимаю <a href="#" class="link">Условия</a> и <a href="#" class="link">Политику конфиденциальности</a></span>
+      <span>Я принимаю <a href="#" class="link" onclick="window.showPolicyModal('terms'); return false;">Условия</a> и <a href="#" class="link" onclick="window.showPolicyModal('privacy'); return false;">Политику конфиденциальности</a></span>
     </label>
     <button id="btn-consent-next" class="btn-primary" disabled>Продолжить</button>
   </div>
@@ -87,7 +90,6 @@
   </header>
 
   <main id="main-content">
-    <!-- ДОМ -->
     <section id="tab-home" class="tab active">
       <div class="stats-grid">
         <div class="stat-card"><div class="stat-num" id="stat-active">0</div><div class="stat-label">Активных</div></div>
@@ -109,12 +111,16 @@
       <div class="task-list" id="home-tasks"></div>
     </section>
 
-    <!-- ЧАТ -->
     <section id="tab-chat" class="tab">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+        <h3 style="flex:1; margin:0;">Чат</h3>
+        <button id="clear-chat-btn" style="background:none; border:none; color:#EF4444; font-size:18px; cursor:pointer; padding:8px;">
+          <i class="fas fa-trash-alt"></i>
+        </button>
+      </div>
       <div class="chat-container" id="chat-messages"></div>
     </section>
 
-    <!-- ПАМЯТЬ -->
     <section id="tab-memory" class="tab">
       <div class="toggle-fav" id="fav-toggle" onclick="window.toggleFavFilter()">
         <span><i class="fas fa-heart"></i> Только избранное</span>
@@ -123,32 +129,44 @@
       <div class="category-list" id="memory-categories"></div>
     </section>
 
-    <!-- НАСТРОЙКИ -->
     <section id="tab-settings" class="tab">
+      <!-- Мой аккаунт будет добавлен скриптом автоматически -->
+
+      <div class="category-item" id="theme-switch-item">
+        <div class="cat-icon"><i class="fas fa-palette"></i></div>
+        <div class="cat-name">Тема оформления</div>
+        <select id="theme-select" style="background:var(--bg-relief); border:1px solid var(--border); color:var(--text-main); padding:8px 12px; border-radius:12px; font-size:14px;">
+          <option value="dark">🌙 Тёмная</option>
+          <option value="light">☀️ Светлая</option>
+          <option value="system">📱 Как в системе</option>
+        </select>
+      </div>
+      
       <div class="category-item" onclick="window.exportData()">
         <div class="cat-icon"><i class="fas fa-download"></i></div>
         <div class="cat-name">Экспорт задач (JSON)</div>
       </div>
-      <div class="category-item" onclick="window.openSupportApp()">
+      
+      <div class="category-item" onclick="window.contactSupport()">
         <div class="cat-icon"><i class="fas fa-headset"></i></div>
         <div class="cat-name" style="color:#60A5FA">Связаться с поддержкой</div>
       </div>
+      
       <div class="category-item" onclick="window.logoutUser()">
         <div class="cat-icon"><i class="fas fa-sign-out-alt"></i></div>
-        <div class="cat-name" style="color:#EF4444">Выйти</div>
+        <div class="cat-name" style="color:#EF4444">Выйти из аккаунта</div>
       </div>
     </section>
   </main>
 
   <div class="input-bar" id="input-bar" style="display:none;">
-    <button id="voice-btn" style="width:44px;height:44px;border:none;border-radius:30px;background:var(--bg-relief);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;transition:all 0.2s;margin-right:8px;">
+    <button id="voice-btn" style="width:44px;height:44px;border:none;border-radius:30px;background:var(--bg-relief);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;margin-right:8px;">
       <i class="fas fa-microphone"></i>
     </button>
     <input type="text" id="chat-input" placeholder="Сообщение...">
     <button id="send-btn"><i class="fas fa-paper-plane"></i></button>
   </div>
 
-  <!-- НИЖНЯЯ НАВИГАЦИЯ -->
   <nav>
     <div class="nav-container">
       <div class="nav-item active" data-tab="home"><i class="fas fa-home"></i><span>Дом</span></div>
@@ -172,18 +190,6 @@
 
 <div id="toast"><i class="fas fa-check"></i> Готово</div>
 
-<!-- 🔧 СКРИПТЫ -->
 <script type="module" src="script.js"></script>
-
-<!-- 🔧 РЕГИСТРАЦИЯ SERVICE WORKER -->
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js', { scope: './' })
-        .then(reg => console.log('✅ SW registered:', reg.scope))
-        .catch(err => console.log('❌ SW error:', err));
-    });
-  }
-</script>
 </body>
 </html>
