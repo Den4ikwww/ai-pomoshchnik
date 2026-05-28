@@ -1,5 +1,5 @@
 // ==========================================
-// 🛡️ FIREBASE ВЕРСИЯ — ФИНАЛЬНАЯ (WHATSAPP + MAX)
+// 🛡️ FIREBASE ВЕРСИЯ — ФИНАЛЬНАЯ (ВСЕ ПРАВКИ)
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -19,7 +19,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
-// 🔒 Сессия сохраняется между перезагрузками
 setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 let firebaseUser = null;
@@ -194,7 +193,7 @@ function renderHome() {
 function escapeHtml(s) { return s ? s.replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m])) : ""; }
 
 // ==========================================
-// 🗑️ ДЕЙСТВИЯ С КОРЗИНОЙ (СТАБИЛЬНАЯ ЛОГИКА)
+// 🗑️ ДЕЙСТВИЯ С КОРЗИНОЙ
 // ==========================================
 function initTrashActions() {
   let trashIcons = document.querySelectorAll('.task-right');
@@ -335,13 +334,14 @@ function showHowToLogin() {
 function contactSupport() {
   haptic(15);
   const phone = "79800984901";
+  const message = encodeURIComponent("Привет, нужна помощь в приложении");
   const maxLink = "https://max.ru/u/f9LHodD0cOKSjUli6Ns65x4yGu3pmpimFApREh3ZzPAEKptq6dwRNcjgexM";
   const o = document.createElement("div"); o.className = "policy-overlay";
   o.innerHTML = `<div class="policy-content" style="text-align:center">
     <h3>Связаться с поддержкой</h3>
     <p>Выберите мессенджер:</p>
     <div style="display:flex; gap:10px; justify-content:center; margin:16px 0">
-      <a href="https://wa.me/${phone}?text=Привет!%20Нужна%20помощь%20с%20приложением" target="_blank" style="flex:1; background:#25D366; color:#fff; padding:12px; border-radius:12px; text-decoration:none; font-weight:600">WhatsApp</a>
+      <a href="https://wa.me/${phone}?text=${message}" target="_blank" style="flex:1; background:#25D366; color:#fff; padding:12px; border-radius:12px; text-decoration:none; font-weight:600">WhatsApp</a>
       <a href="${maxLink}" target="_blank" style="flex:1; background:#0088cc; color:#fff; padding:12px; border-radius:12px; text-decoration:none; font-weight:600">MAX</a>
     </div>
     <button class="policy-btn">Закрыть</button>
@@ -454,16 +454,86 @@ function processUserMessage(text) {
 function handleSend() { const txt = chatInput?.value.trim(); if (!txt) return; processUserMessage(txt); chatInput.value = ""; }
 
 function toggleVoiceInput() { voiceRecording ? stopVoice() : startVoice(); }
+
 function startVoice() {
-  haptic(15); const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { addMessage("🎤 Голосовой ввод не поддерживается в этом браузере.", "ai"); return; }
-  recognition = new SR(); recognition.lang = "ru-RU"; recognition.interimResults = false;
-  recognition.onstart = () => { voiceRecording = true; updateVoiceUI(); addMessage("🎤 Слушаю...", "ai"); };
-  recognition.onresult = e => { const t = e.results[0][0].transcript.trim(); if (t) processUserMessage(t); };
-  recognition.onerror = e => { voiceRecording = false; updateVoiceUI(); addMessage(`🎤 Ошибка: ${e.error}`, "ai"); };
-  recognition.onend = () => { voiceRecording = false; updateVoiceUI(); };
-  try { recognition.start(); } catch { voiceRecording = false; updateVoiceUI(); addMessage("🎤 Не удалось запустить.", "ai"); }
+  haptic(15);
+  
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    addMessage("🎤 Голосовой ввод не поддерживается в этом браузере. Попробуйте Chrome.", "ai");
+    updateVoiceUI();
+    return;
+  }
+  
+  if (!navigator.onLine) {
+    addMessage("🌐 Нет подключения к интернету. Распознавание речи требует сеть.", "ai");
+    updateVoiceUI();
+    return;
+  }
+  
+  try {
+    recognition = new SR();
+    recognition.lang = "ru-RU";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+    
+    recognition.onstart = () => {
+      voiceRecording = true;
+      updateVoiceUI();
+      addMessage("🎤 Говорите, я слушаю...", "ai");
+    };
+    
+    recognition.onspeechstart = () => {
+      addMessage("👂 Слышу речь...", "ai");
+    };
+    
+    recognition.onresult = (e) => {
+      const text = e.results[0][0].transcript.trim();
+      if (text) {
+        addMessage("📝 Распознано: \"" + text + "\"", "ai");
+        processUserMessage(text);
+      } else {
+        addMessage("🎤 Ничего не распознано. Попробуйте ещё раз.", "ai");
+      }
+    };
+    
+    recognition.onerror = (e) => {
+      voiceRecording = false;
+      updateVoiceUI();
+      
+      const errors = {
+        "no-speech": "🎤 Речь не обнаружена. Говорите громче и ближе к микрофону.",
+        "aborted": "🎤 Запись прервана.",
+        "audio-capture": "🎤 Микрофон не найден. Проверьте подключение.",
+        "network": "🌐 Ошибка сети. Проверьте интернет.",
+        "not-allowed": "🔇 Доступ к микрофону запрещён. Разрешите в настройках браузера.",
+        "service-not-allowed": "🚫 Сервис распознавания недоступен.",
+        "bad-grammar": "⚠️ Ошибка грамматики распознавания.",
+        "language-not-supported": "🌍 Язык не поддерживается."
+      };
+      
+      const msg = errors[e.error] || "🎤 Ошибка: " + e.error;
+      addMessage(msg, "ai");
+      console.error("SpeechRecognition error:", e.error, e.message);
+    };
+    
+    recognition.onend = () => {
+      voiceRecording = false;
+      updateVoiceUI();
+    };
+    
+    recognition.start();
+    console.log("🎤 SpeechRecognition запущен");
+    
+  } catch (e) {
+    voiceRecording = false;
+    updateVoiceUI();
+    addMessage("🎤 Ошибка запуска: " + e.message, "ai");
+    console.error("SpeechRecognition start error:", e);
+  }
 }
+
 function stopVoice() { if (recognition) recognition.stop(); voiceRecording = false; updateVoiceUI(); }
 function updateVoiceUI() { const b = $("voice-btn"); if (!b) return; b.innerHTML = voiceRecording ? '<i class="fas fa-stop"></i>' : '<i class="fas fa-microphone"></i>'; b.style.background = voiceRecording ? "#EF4444" : "var(--bg-relief)"; b.style.color = voiceRecording ? "#fff" : "var(--text-muted)"; b.classList.toggle("voice-recording", voiceRecording); }
 
