@@ -1,9 +1,9 @@
 // ==========================================
-// 🛡️ FIREBASE ВЕРСИЯ — ФИНАЛЬНАЯ (ANDROID CHROME)
+// 🛡️ FIREBASE ВЕРСИЯ — ОЧИЩЕННАЯ
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDocs, addDoc, deleteDoc, updateDoc, query, orderBy, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDocs, query, orderBy, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDFvrwVTOVJs4taMF2VwDwTxP1a3JYWsow",
@@ -27,31 +27,24 @@ let tasks = [];
 let homeFilter = "reminder";
 let notifyFilter = "all";
 let showFavoritesOnly = false;
-let showOldTasks = false;
 let awaitingTypeConfirm = null;
 let recognition = null;
 let voiceRecording = false;
 let chatInput = null;
 let chatMessages = null;
-let deletedItemsCount = 0;
 
-const $ = (id) => document.getElementById(id);
-const safeGet = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const $ = id => document.getElementById(id);
+const safeGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
 const safeSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-const haptic = (ms = 10) => { if (navigator.vibrate) navigator.vibrate(ms); };
+const haptic = (ms = 10) => navigator.vibrate && navigator.vibrate(ms);
 
-// ==========================================
-// 🎨 ТЕМА
-// ==========================================
+// ====================== ТЕМА ======================
 function applyTheme(theme) {
   const t = theme || safeGet("app_theme", "dark");
-  if (t === "system") {
-    document.body.classList.toggle("light-theme", !window.matchMedia("(prefers-color-scheme: dark)").matches);
-  } else {
-    document.body.classList.toggle("light-theme", t === "light");
-  }
+  document.body.classList.toggle("light-theme", t === "light" || (t === "system" && !window.matchMedia("(prefers-color-scheme: dark)").matches));
   safeSet("app_theme", t);
 }
+
 function setupTheme() {
   const sel = $("theme-select");
   if (!sel) return;
@@ -60,9 +53,7 @@ function setupTheme() {
   sel.onchange = () => applyTheme(sel.value);
 }
 
-// ==========================================
-// ☁️ FIREBASE SYNC
-// ==========================================
+// ====================== FIREBASE SYNC ======================
 async function syncTasksToFirebase(uid, list) {
   if (!uid) return;
   try {
@@ -97,9 +88,7 @@ async function saveTasks() {
   if (firebaseUser) await syncTasksToFirebase(firebaseUser.uid, tasks);
 }
 
-// ==========================================
-// 📱 UI ROUTING
-// ==========================================
+// ====================== UI ROUTING ======================
 function showScreen(id) {
   ["auth-screen", "consent-screen", "app-wrapper"].forEach(s => {
     const el = $(s);
@@ -137,10 +126,8 @@ function initNav() {
   });
 }
 
-// ==========================================
-// 🏠 HOME RENDER
-// ==========================================
-function setHomeFilter(type) { haptic(15); homeFilter = type; showOldTasks = false; updateFilterUI(); renderHome(); }
+// ====================== HOME RENDER ======================
+function setHomeFilter(type) { haptic(15); homeFilter = type; updateFilterUI(); renderHome(); }
 function setNotifyFilter(type) { haptic(15); notifyFilter = type; updateFilterUI(); renderHome(); }
 
 function updateFilterUI() {
@@ -168,7 +155,7 @@ function renderHome() {
   let vis = tasks.filter(t => !t.deletedAt && (homeFilter === "reminder" ? t.datetime : !t.datetime));
   if (homeFilter === "reminder" && notifyFilter !== "all") vis = vis.filter(t => t.notifyType === notifyFilter && !t.done);
   vis.sort((a, b) => new Date(b.created) - new Date(a.created));
-  if (!showOldTasks) vis = vis.filter(t => new Date(t.created).getTime() > Date.now() - 604800000);
+  vis = vis.filter(t => new Date(t.created).getTime() > Date.now() - 604800000);
   if (vis.length === 0) { list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">Пусто</div>'; return; }
 
   list.innerHTML = vis.map((t, i) => {
@@ -187,14 +174,16 @@ function renderHome() {
       </div>
     </div>`;
   }).join("");
+  
+  // АВТОСКРОЛЛ ВНИЗ
+  list.scrollTop = list.scrollHeight;
+  
   initTrashActions();
 }
 
 function escapeHtml(s) { return s ? s.replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m])) : ""; }
 
-// ==========================================
-// 🗑️ ДЕЙСТВИЯ С КОРЗИНОЙ
-// ==========================================
+// ====================== КОРЗИНА ======================
 function initTrashActions() {
   let trashIcons = document.querySelectorAll('.task-right');
   for (let i = 0; i < trashIcons.length; i++) {
@@ -280,9 +269,7 @@ function initTrashActions() {
 function toggleDone(id, e) { if (e) e.stopPropagation(); haptic(15); const t = tasks.find(x => x.id === id); if (t) { t.done = !t.done; saveTasks(); renderHome(); } }
 function deleteToTrash(id) { haptic(50); tasks = tasks.filter(t => t.id !== id); saveTasks(); renderHome(); renderMemory(); showToast(); }
 
-// ==========================================
-// 🗂️ MEMORY & MODALS
-// ==========================================
+// ====================== MEMORY & MODALS ======================
 function toggleFavFilter() { haptic(15); showFavoritesOnly = !showFavoritesOnly; const toggle = $("fav-toggle"); if (toggle) toggle.classList.toggle("active", showFavoritesOnly); renderMemory(); }
 function renderMemory() {
   const wrap = $("memory-categories"); if (!wrap) return;
@@ -301,6 +288,29 @@ function showCustomConfirm(msg, cb) {
   o.onclick = e => { if (e.target === o) document.body.removeChild(o); };
 }
 
+function showModal(title, content, buttons = []) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;";
+  overlay.innerHTML = `
+    <div class="modal" style="background:var(--bg-card);width:90%;max-width:400px;border-radius:28px;padding:24px;border:1px solid var(--border);">
+      <h2 style="margin-bottom:20px;font-size:22px;text-align:center;background:linear-gradient(135deg,var(--purple-light) 0%,var(--green) 100%);-webkit-background-clip:text;background-clip:text;color:transparent;">${title}</h2>
+      <div style="color:var(--text-main);line-height:1.6;">${content}</div>
+      <div style="display:flex;gap:12px;margin-top:24px;"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const actions = overlay.querySelector(".modal > div:last-child");
+  buttons.forEach(btn => {
+    const b = document.createElement("button");
+    b.className = btn.primary ? "btn-save" : "btn-cancel";
+    b.textContent = btn.text;
+    b.style.cssText = btn.primary ? "flex:1;background:var(--green);color:#0A0A0A;border:none;padding:12px;border-radius:40px;font-weight:600;cursor:pointer;" : "flex:1;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:12px;border-radius:40px;cursor:pointer;";
+    b.onclick = () => { btn.action(); overlay.remove(); };
+    actions.appendChild(b);
+  });
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+}
+
 function openEditModal(id) { haptic(15); const t = tasks.find(x => x.id === id); if (!t) return; $("edit-id").value = t.id; $("edit-title").value = t.title; $("edit-notify-type").value = t.notifyType || "important"; $("edit-datetime").value = t.datetime || ""; $("edit-modal").classList.add("active"); }
 function closeModal() { haptic(10); const modal = $("edit-modal"); if (modal) { modal.classList.remove("active"); if (window.__modalEscapeHandler) { document.removeEventListener('keydown', window.__modalEscapeHandler); window.__modalEscapeHandler = null; } } }
 function saveEdit() {
@@ -310,9 +320,7 @@ function saveEdit() {
   saveTasks(); renderHome(); closeModal();
 }
 
-// ==========================================
-// 🔐 AUTH & SUPPORT
-// ==========================================
+// ====================== AUTH & SUPPORT ======================
 function togglePasswordVisibility(inputId, btn) {
   const inp = $(inputId); if (!inp) return;
   inp.type = inp.type === "password" ? "text" : "password";
@@ -321,37 +329,26 @@ function togglePasswordVisibility(inputId, btn) {
 
 function showHowToLogin() {
   haptic(10);
-  document.querySelector('.howto-overlay')?.remove();
-  const o = document.createElement("div"); o.className = "howto-overlay policy-overlay";
-  o.innerHTML = `<div class="policy-content"><h3 style="margin-bottom:16px;">Как войти в приложение</h3><p style="color:var(--text-main);line-height:1.6;font-size:14.5px;">• Через <strong>Email и пароль</strong><br>• Через <strong>Google аккаунт</strong><br><br>Если забыли пароль — напишите в поддержку.</p><button class="policy-btn">Понятно</button></div>`;
-  document.body.appendChild(o);
-  const close = () => { o.style.opacity = '0'; setTimeout(() => o.remove(), 200); };
-  o.querySelector(".policy-btn").onclick = close;
-  o.onclick = e => { if (e.target === o) close(); };
-  document.addEventListener('keydown', function onEsc(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); } }, { once: false });
+  showModal("Как войти в приложение", `
+    <p>• Через <strong>Email и пароль</strong><br>
+       • Через <strong>Google аккаунт</strong><br><br>
+       Если забыли пароль — напишите в поддержку.</p>
+  `, [{ text: "Понятно", primary: true, action: () => {} }]);
 }
 
 function contactSupport() {
   haptic(15);
   const phone = "79800984901";
-  const message = encodeURIComponent("Привет, нужна помощь в приложении");
+  const waLink = `https://wa.me/${phone}?text=${encodeURIComponent("Привет, нужна помощь в Умном блокноте")}`;
   const maxLink = "https://max.ru/u/f9LHodD0cOKSjUli6Ns65x4yGu3pmpimFApREh3ZzPAEKptq6dwRNcjgexM";
-  const waLink = `https://wa.me/${phone}?text=${message}`;
   
-  const o = document.createElement("div"); o.className = "policy-overlay";
-  o.innerHTML = `<div class="policy-content" style="text-align:center">
-    <h3>Связаться с поддержкой</h3>
-    <p>Выберите мессенджер:</p>
-    <div style="display:flex; gap:10px; justify-content:center; margin:16px 0">
-      <a href="${waLink}" target="_blank" rel="noopener" style="flex:1; background:#25D366; color:#fff; padding:12px; border-radius:12px; text-decoration:none; font-weight:600; display:block;">WhatsApp</a>
-      <a href="${maxLink}" target="_blank" rel="noopener" style="flex:1; background:#0088cc; color:#fff; padding:12px; border-radius:12px; text-decoration:none; font-weight:600; display:block;">MAX</a>
+  showModal("Связаться с поддержкой", `
+    <p style="text-align:center">Выберите мессенджер:</p>
+    <div style="display:flex;gap:12px;justify-content:center;margin:20px 0">
+      <a href="${waLink}" target="_blank" rel="noopener" style="flex:1;background:#25D366;color:#fff;padding:14px;border-radius:12px;text-align:center;text-decoration:none;">WhatsApp</a>
+      <a href="${maxLink}" target="_blank" rel="noopener" style="flex:1;background:#0088cc;color:#fff;padding:14px;border-radius:12px;text-align:center;text-decoration:none;">MAX</a>
     </div>
-    <button class="policy-btn">Закрыть</button>
-  </div>`;
-  document.body.appendChild(o);
-  const close = () => { o.style.opacity = '0'; setTimeout(() => o.remove(), 200); };
-  o.querySelector(".policy-btn").onclick = close;
-  o.onclick = e => { if (e.target === o) close(); };
+  `, [{ text: "Закрыть", action: () => {} }]);
 }
 
 function logoutUser() {
@@ -367,42 +364,33 @@ function logoutUser() {
   });
 }
 
-function exportData() {
-  haptic(20); if (tasks.length === 0) return alert("Нет задач");
-  const a = document.createElement("a"); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tasks, null, 2));
-  a.download = `backup_${Date.now()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
-
 function editUserName() {
   const n = prompt("Новое имя:", currentUserName); if (!n?.trim()) return;
   currentUserName = n.trim();
-  if (firebaseUser) { updateProfile(firebaseUser, { displayName: currentUserName }); safeSet(`profile_${firebaseUser.uid}`, { name: currentUserName }); }
-  renderMyAccount(); showToast();
+  if (firebaseUser) updateProfile(firebaseUser, { displayName: currentUserName });
+  safeSet(`profile_${firebaseUser.uid}`, { name: currentUserName });
+  renderMyAccount();
+  showToast();
 }
 
-function showPolicyModal(type) {
-  haptic(15);
-  const content = {
-    terms: { title: 'Условия использования', text: '<p>1. Вы используете приложение на свой страх и риск.</p><p>2. Данные синхронизируются с вашим аккаунтом Firebase.</p><p>3. Мы не продаём и не передаём ваши данные третьим лицам.</p><p>4. Вы можете экспортировать или удалить свои данные в любой момент.</p><p class="text-muted" style="margin-top:12px;font-size:12px;">Версия 1.0 от ' + new Date().toLocaleDateString('ru') + '</p>' },
-    privacy: { title: 'Политика конфиденциальности', text: '<p>1. Мы собираем только email и имя для авторизации.</p><p>2. Ваши задачи хранятся в защищённой базе Firebase.</p><p>3. Голосовые данные обрабатываются локально в браузере.</p><p>4. Вы можете запросить удаление всех данных через поддержку.</p><p class="text-muted" style="margin-top:12px;font-size:12px;">Версия 1.0 от ' + new Date().toLocaleDateString('ru') + '</p>' }
-  };
-  const data = content[type] || content.terms;
-  const o = document.createElement("div"); o.className = "policy-overlay";
-  o.innerHTML = `<div class="policy-content"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3 style="margin:0;">${data.title}</h3><button class="policy-close">&times;</button></div><div>${data.text}</div><button class="policy-btn">Понятно</button></div>`;
-  document.body.appendChild(o);
-  const close = () => { o.style.opacity = '0'; setTimeout(() => o.remove(), 200); document.removeEventListener('keydown', onEscape); };
-  const onEscape = (e) => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', onEscape);
-  o.querySelector(".policy-close").onclick = close;
-  o.querySelector(".policy-btn").onclick = close;
-  o.onclick = e => { if (e.target === o) close(); };
+function showToast() {
+  const t = $("toast");
+  if (t) { t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); }
 }
 
 function renderMyAccount() {
   const s = $("tab-settings"); if (!s) return;
-  const email = firebaseUser?.email || "—"; const photo = firebaseUser?.photoURL || "https://via.placeholder.com/48/10B981/ffffff?text=👤";
   const old = s.querySelector('.category-item[onclick*="editUserName"]'); if (old) old.remove();
-  s.insertAdjacentHTML("afterbegin", `<div class="category-item" onclick="editUserName()" style="position:relative;"><div class="cat-icon" style="background:none;padding:0;"><img src="${photo}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #10B981;"></div><div class="cat-name">${currentUserName}<br><small style="color:#888;font-size:12px;">${email}</small></div></div>`);
+  const email = firebaseUser?.email || "—";
+  const photo = firebaseUser?.photoURL || "https://via.placeholder.com/64/10B981/ffffff?text=👤";
+  s.insertAdjacentHTML("afterbegin", `
+    <div class="category-item" onclick="editUserName()" style="position:relative;">
+      <div class="cat-icon" style="background:none;padding:0;width:64px;height:64px;">
+        <img src="${photo}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid var(--green);">
+      </div>
+      <div class="cat-name">${currentUserName}<br><small style="color:var(--text-muted)">${email}</small></div>
+    </div>
+  `);
 }
 
 let categories = safeGet("ai_categories", [
@@ -414,10 +402,17 @@ let categories = safeGet("ai_categories", [
   { id: "inventory", name: "Инвентаризация", fav: false }, { id: "deleted", name: "Удаленные", fav: false }
 ]);
 
-// ==========================================
-// 💬 CHAT & VOICE
-// ==========================================
-function addMessage(txt, s) { if (!chatMessages) return; const d = document.createElement("div"); d.className = `message ${s}`; d.innerHTML = `<div class="bubble fade-in">${txt}</div>`; chatMessages.appendChild(d); chatMessages.scrollTop = chatMessages.scrollHeight; }
+// ====================== CHAT & VOICE ======================
+function addMessage(txt, s) {
+  if (!chatMessages) return;
+  const d = document.createElement("div");
+  d.className = `message ${s}`;
+  d.innerHTML = `<div class="bubble fade-in">${txt}</div>`;
+  chatMessages.appendChild(d);
+  // АВТОСКРОЛЛ ВНИЗ
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
 function toSafeStr(t) { return String(t || "").toLowerCase().trim(); }
 
 function parseUserInput(text) {
@@ -459,101 +454,33 @@ function toggleVoiceInput() { voiceRecording ? stopVoice() : startVoice(); }
 
 function startVoice() {
   haptic(15);
-  
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    addMessage("🎤 Голосовой ввод не поддерживается в этом браузере. Попробуйте Chrome.", "ai");
-    updateVoiceUI();
-    return;
-  }
-  
-  if (!navigator.onLine) {
-    addMessage("🌐 Нет подключения к интернету. Распознавание речи требует сеть.", "ai");
-    updateVoiceUI();
-    return;
-  }
-  
-  if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-    addMessage("🔒 Требуется HTTPS. Откройте через защищённое соединение.", "ai");
-    updateVoiceUI();
-    return;
-  }
-  
+  if (!SR) { addMessage("🎤 Голосовой ввод не поддерживается в этом браузере. Попробуйте Chrome.", "ai"); updateVoiceUI(); return; }
+  if (!navigator.onLine) { addMessage("🌐 Нет подключения к интернету. Распознавание речи требует сеть.", "ai"); updateVoiceUI(); return; }
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost') { addMessage("🔒 Требуется HTTPS. Откройте через защищённое соединение.", "ai"); updateVoiceUI(); return; }
   try {
-    if (recognition) {
-      try { recognition.abort(); } catch(e) {}
-      recognition = null;
-    }
-    
+    if (recognition) { try { recognition.abort(); } catch(e) {} recognition = null; }
     recognition = new SR();
     recognition.lang = "ru-RU";
     recognition.interimResults = false;
     recognition.continuous = false;
     recognition.maxAlternatives = 1;
-    
-    recognition.onstart = () => {
-      voiceRecording = true;
-      updateVoiceUI();
-      addMessage("🎤 Говорите, я слушаю...", "ai");
-    };
-    
-    recognition.onspeechstart = () => {
-      addMessage("👂 Слышу речь...", "ai");
-    };
-    
+    recognition.onstart = () => { voiceRecording = true; updateVoiceUI(); addMessage("🎤 Говорите, я слушаю...", "ai"); };
+    recognition.onspeechstart = () => { addMessage("👂 Слышу речь...", "ai"); };
     recognition.onresult = (e) => {
       const text = e.results[0][0].transcript.trim();
-      if (text) {
-        addMessage("📝 Распознано: \"" + text + "\"", "ai");
-        processUserMessage(text);
-      } else {
-        addMessage("🎤 Ничего не распознано. Попробуйте ещё раз.", "ai");
-      }
+      if (text) { addMessage("📝 Распознано: \"" + text + "\"", "ai"); processUserMessage(text); }
+      else { addMessage("🎤 Ничего не распознано. Попробуйте ещё раз.", "ai"); }
     };
-    
     recognition.onerror = (e) => {
-      voiceRecording = false;
-      updateVoiceUI();
-      
-      const errors = {
-        "no-speech": "🎤 Речь не обнаружена. Говорите громче и ближе к микрофону.",
-        "aborted": "🎤 Запись прервана.",
-        "audio-capture": "🎤 Микрофон не найден. Проверьте подключение.",
-        "network": "🌐 Ошибка сети. Проверьте интернет.",
-        "not-allowed": "🔇 Доступ к микрофону запрещён. Разрешите в настройках браузера.",
-        "service-not-allowed": "🚫 Сервис распознавания недоступен.",
-        "bad-grammar": "⚠️ Ошибка грамматики распознавания.",
-        "language-not-supported": "🌍 Язык не поддерживается."
-      };
-      
-      const msg = errors[e.error] || "🎤 Ошибка: " + e.error;
-      addMessage(msg, "ai");
+      voiceRecording = false; updateVoiceUI();
+      const errors = { "no-speech": "🎤 Речь не обнаружена. Говорите громче и ближе к микрофону.", "aborted": "🎤 Запись прервана.", "audio-capture": "🎤 Микрофон не найден. Проверьте подключение.", "network": "🌐 Ошибка сети. Проверьте интернет.", "not-allowed": "🔇 Доступ к микрофону запрещён. Разрешите в настройках браузера.", "service-not-allowed": "🚫 Сервис распознавания недоступен.", "bad-grammar": "⚠️ Ошибка грамматики распознавания.", "language-not-supported": "🌍 Язык не поддерживается." };
+      addMessage(errors[e.error] || "🎤 Ошибка: " + e.error, "ai");
       console.error("SpeechRecognition error:", e.error, e.message);
     };
-    
-    recognition.onend = () => {
-      voiceRecording = false;
-      updateVoiceUI();
-    };
-    
-    setTimeout(() => {
-      try {
-        recognition.start();
-        console.log("🎤 SpeechRecognition запущен");
-      } catch(err) {
-        voiceRecording = false;
-        updateVoiceUI();
-        addMessage("🎤 Ошибка запуска: " + err.message, "ai");
-        console.error("SpeechRecognition start error:", err);
-      }
-    }, 100);
-    
-  } catch (e) {
-    voiceRecording = false;
-    updateVoiceUI();
-    addMessage("🎤 Ошибка запуска: " + e.message, "ai");
-    console.error("SpeechRecognition start error:", e);
-  }
+    recognition.onend = () => { voiceRecording = false; updateVoiceUI(); };
+    setTimeout(() => { try { recognition.start(); console.log("🎤 SpeechRecognition запущен"); } catch(err) { voiceRecording = false; updateVoiceUI(); addMessage("🎤 Ошибка запуска: " + err.message, "ai"); console.error("SpeechRecognition start error:", err); } }, 100);
+  } catch (e) { voiceRecording = false; updateVoiceUI(); addMessage("🎤 Ошибка запуска: " + e.message, "ai"); console.error("SpeechRecognition start error:", e); }
 }
 
 function stopVoice() { if (recognition) recognition.stop(); voiceRecording = false; updateVoiceUI(); }
@@ -566,22 +493,25 @@ function setupChat() {
   const voiceBtn = $("voice-btn"); if (voiceBtn) voiceBtn.onclick = toggleVoiceInput;
   const clearBtn = $("clear-chat-btn");
   if (clearBtn) clearBtn.onclick = () => { if (confirm("Очистить историю чата?")) { if (chatMessages) chatMessages.innerHTML = ""; localStorage.removeItem("chat_history"); addMessage("🧹 История чата очищена", "ai"); } };
-  if (chatMessages && chatMessages.children.length === 0) { const name = firebaseUser?.displayName || "Пользователь"; chatMessages.innerHTML = `<div class="message ai"><div class="bubble">Привет, ${name}! 👋 Я готов к работе.</div></div>`; }
+  if (chatMessages && chatMessages.children.length === 0) { const name = firebaseUser?.displayName || "Пользователь"; chatMessages.innerHTML = `<div class="message ai"><div class="bubble">Привет, ${name}! 👋 Я готов к работе.</div></div>`; chatMessages.scrollTop = chatMessages.scrollHeight; }
 }
 
-function showToast() {
-  const t = $("toast");
-  if (t) { t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); }
+function showPolicyModal(type) {
+  haptic(15);
+  const content = {
+    terms: { title: 'Условия использования', text: '<p>1. Вы используете приложение на свой страх и риск.</p><p>2. Данные синхронизируются с вашим аккаунтом Firebase.</p><p>3. Мы не продаём и не передаём ваши данные третьим лицам.</p><p>4. Вы можете экспортировать или удалить свои данные в любой момент.</p><p class="text-muted" style="margin-top:12px;font-size:12px;">Версия 1.0 от ' + new Date().toLocaleDateString('ru') + '</p>' },
+    privacy: { title: 'Политика конфиденциальности', text: '<p>1. Мы собираем только email и имя для авторизации.</p><p>2. Ваши задачи хранятся в защищённой базе Firebase.</p><p>3. Голосовые данные обрабатываются локально в браузере.</p><p>4. Вы можете запросить удаление всех данных через поддержку.</p><p class="text-muted" style="margin-top:12px;font-size:12px;">Версия 1.0 от ' + new Date().toLocaleDateString('ru') + '</p>' }
+  };
+  const data = content[type] || content.terms;
+  showModal(data.title, data.text, [{ text: "Понятно", primary: true, action: () => {} }]);
 }
 
-// ==========================================
-// 🔥 INIT & AUTH STATE
-// ==========================================
+// ====================== INIT & AUTH STATE ======================
 function initExports() {
   window.toggleDone = toggleDone; window.deleteToTrash = deleteToTrash; window.openEditModal = openEditModal;
   window.closeModal = closeModal; window.saveEdit = saveEdit; window.setHomeFilter = setHomeFilter;
   window.setNotifyFilter = setNotifyFilter; window.toggleFavFilter = toggleFavFilter; window.toggleCategoryFav = toggleCategoryFav;
-  window.logoutUser = logoutUser; window.exportData = exportData; window.contactSupport = contactSupport;
+  window.logoutUser = logoutUser; window.contactSupport = contactSupport;
   window.togglePasswordVisibility = togglePasswordVisibility; window.showHowToLogin = showHowToLogin;
   window.editUserName = editUserName; window.toggleVoiceInput = toggleVoiceInput; window.showPolicyModal = showPolicyModal;
 }

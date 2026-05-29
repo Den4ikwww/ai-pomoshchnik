@@ -72,6 +72,7 @@ body {
   width: 100%;
   max-width: 360px;
   text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
 
 .auth-icon {
@@ -341,7 +342,7 @@ main {
 }
 
 main.chat-active {
-  padding-bottom: calc(var(--nav-h) + var(--input-bar-h) + 20px);
+  padding-bottom: calc(var(--nav-h) + var(--input-bar-h) + 40px);
 }
 
 .tab {
@@ -373,6 +374,11 @@ main.chat-active {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* СПИСОК ЗАДАЧ НА ГЛАВНОЙ */
+#home-tasks {
+  padding-bottom: 120px;
 }
 
 /* STATS & FILTERS */
@@ -773,9 +779,10 @@ main.chat-active {
   flex-direction: column;
   gap: 10px;
   min-height: 60vh;
-  padding-bottom: 80px;
+  padding-bottom: 140px;
   overflow-y: auto;
   max-height: calc(100vh - 250px);
+  scroll-behavior: smooth;
 }
 
 .message {
